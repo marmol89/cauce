@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 220" fill="none">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Queue icon: stacked rectangles -->
+  <rect x="40" y="44" width="60" height="14" rx="3" fill="url(#g)" opacity="0.35"/>
+  <rect x="32" y="68" width="76" height="14" rx="3" fill="url(#g)" opacity="0.55"/>
+  <rect x="24" y="92" width="92" height="14" rx="3" fill="url(#g)" opacity="0.75"/>
+  <rect x="16" y="116" width="108" height="14" rx="3" fill="url(#g)"/>
+
+  <!-- Arrow into queue -->
+  <path d="M140 92l22 0" stroke="#6366f1" stroke-width="4" stroke-linecap="round"/>
+  <polygon points="166,92 154,82 154,102" fill="#6366f1"/>
+
+  <!-- Cauce text - dark for light mode -->
+  <text x="200" y="99" font-family="system-ui, -apple-system, sans-serif" font-size="68" font-weight="800" fill="#0f172a" letter-spacing="-2">cauce</text>
+
+  <!-- Tagline -->
+  <text x="200" y="134" font-family="system-ui, -apple-system, sans-serif" font-size="17" fill="#64748b" font-weight="500">Driver-agnostic queue monitoring for Laravel</text>
+
+  <!-- Bottom bar -->
+  <rect x="200" y="152" width="360" height="3" rx="1.5" fill="url(#g)" opacity="0.4"/>
+</svg>
