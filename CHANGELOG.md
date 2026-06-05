@@ -11,18 +11,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dead-Letter Queue (DLQ) with `cauce:dlq-replay` command for replaying dead-lettered jobs.
 - Laravel events: `CircuitBreakerOpened`, `CircuitBreakerClosed`, `CircuitBreakerHalfOpened`, `JobRetried`, `AlertTriggered`.
 - `AlertManager` now supports `mail`, `slack`, and `webhook` alert channels.
-- Healthcheck endpoint at `/cauce/api/health` for uptime monitoring.
+- Healthcheck endpoint at `/cauce/api/health` without authentication (monitoring-tool friendly).
 - `globalTotals()` method on `MetricsRepository` for cross-connection/queue aggregation.
 - `openKeys()` static method on `CircuitBreaker` for listing open breakers.
 - Cache support for `distinctTags()` to avoid expensive queries on large tables.
 - Local CSS build option via `CAUCE_CSS_SOURCE=local` and `cauce-assets` publish tag.
 - Configurable default retry parameters: `default_base`, `default_cap`, `default_threshold`, `default_cooldown`, `default_breaker_key`.
+- Gate-based authorization now evaluates the authenticated user via `require_authentication` and `authorization_callback` config.
+- `roave/security-advisories` added to dev dependencies for CVE protection.
+- Configurable log channel via `CAUCE_LOG_CHANNEL`.
+- Queue health check via `CAUCE_HEALTH_CHECK_QUEUE`.
+- Configurable tag-fetch limit via `CAUCE_TAGS_FETCH_LIMIT`.
 
 ### Changed
 - **Circuit breaker `upsertRow()` now uses atomic `upsert()` instead of `exists()` + `insert/update`** to eliminate race conditions.
 - **Metrics increments on MySQL use `INSERT ... ON DUPLICATE KEY UPDATE`** for atomic counters under high concurrency.
 - **`pruneCompleted()` now prunes stuck jobs without `finished_at`** based on `created_at`.
 - **API routes use separate middleware group** (`api` guard + throttling) without CSRF requirement.
+- **ApiController now validates all query parameters** (`per_page`, `hours`, `status`, etc.) with proper min/max bounds and allowed-value whitelists.
+- **API routes now use `/api/v1` prefix** for forward-compatibility; health endpoint remains unversioned.
+- **`mutateCauce` Gate now correctly allows mutations in dev environments** without requiring `allow_production_mutate`.
+- **Database read queries wrapped in try/catch** to prevent 500 errors on dashboard if DB is temporarily unavailable.
+- **`RetryManager::forJob()` and `resolveDefault()` wrapped in try/catch** to handle misconfigured strategy classes gracefully.
+- **Livewire `$wire.on()` replaces global `Livewire.on()`** in metrics chart for proper cleanup on component destroy.
+- `addslashes()` replaced with `e()` for proper HTML attribute escaping in Blade.
+- Indentation normalized to 4-space across all source files.
+
+### Removed
+- **`TrackJob` middleware removed** — it was an empty pass-through placeholder with no registered usage.
 - **`Authorize` middleware supports both web and API guards** for token-based auth.
 - **Payload truncation is progressive** (strips `data.command` before discarding).
 - **Livewire components use dependency injection** instead of `app()` calls.

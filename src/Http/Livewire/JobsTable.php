@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marmol89\Cauce\Http\Livewire;
 
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -40,6 +41,8 @@ class JobsTable extends Component
 
     public function mount(): void
     {
+        Gate::authorize('viewCauce');
+
         $this->perPage = max(5, min(100, (int) config('cauce.dashboard.rows_per_page', 25)));
     }
 

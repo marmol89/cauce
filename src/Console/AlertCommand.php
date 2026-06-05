@@ -9,17 +9,17 @@ use Marmol89\Cauce\Support\AlertManager;
 
 class AlertCommand extends Command
 {
-	protected $signature = 'cauce:alerts';
-	protected $description = 'Check and send Cauce alerts.';
+    protected $signature = 'cauce:alerts';
+    protected $description = 'Check and send Cauce alerts.';
 
-	public function handle(AlertManager $alerts): int
-	{
-		$alerts->checkFailedJobThreshold();
+    public function handle(AlertManager $alerts): int
+    {
+        $alerts->checkFailedJobThreshold();
 
-		if ($this->option('verbose')) {
-			$this->info('Cauce alerts checked.');
-		}
+        if ($this->option('verbose')) {
+            $this->info('Cauce alerts checked.');
+        }
 
-		return self::SUCCESS;
-	}
+        return self::SUCCESS;
+    }
 }

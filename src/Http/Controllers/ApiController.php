@@ -18,129 +18,149 @@ class ApiController extends Controller
     {
     }
 
-	public function status(Request $request, JobRepository $jobs): JsonResponse
-	{
-		$hours = (int) $request->input('hours', 24);
+    public function status(Request $request, JobRepository $jobs): JsonResponse
+    {
+        $validated = $request->validate([
+            'hours' => ['sometimes', 'integer', 'min:1', 'max:720'],
+        ]);
 
-		return response()->json([
-			'data' => [
-				'by_status' => $jobs->countsByStatus($hours),
-				'by_connection' => $jobs->countsByConnection($hours),
-				'by_queue' => $jobs->countsByQueue($hours),
-			],
-		]);
-	}
+        $hours = (int) ($validated['hours'] ?? 24);
 
-	public function jobs(Request $request, JobRepository $jobs): JsonResponse
-	{
-		$perPage = (int) $request->input('per_page', 25);
-		$filters = [];
+        return response()->json([
+            'data' => [
+                'by_status' => $jobs->countsByStatus($hours),
+                'by_connection' => $jobs->countsByConnection($hours),
+                'by_queue' => $jobs->countsByQueue($hours),
+            ],
+        ]);
+    }
 
-		if ($request->filled('status')) {
-			$filters['status'] = (string) $request->input('status');
-		}
+    public function jobs(Request $request, JobRepository $jobs): JsonResponse
+    {
+        $validated = $request->validate([
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:500'],
+            'status' => ['sometimes', 'string', 'in:queued,processing,completed,retrying,failed'],
+            'connection' => ['sometimes', 'string', 'max:255'],
+            'queue' => ['sometimes', 'string', 'max:255'],
+            'search' => ['sometimes', 'string', 'max:255'],
+        ]);
 
-		if ($request->filled('connection')) {
-			$filters['connection'] = (string) $request->input('connection');
-		}
+        $perPage = (int) ($validated['per_page'] ?? 25);
+        $filters = [];
 
-		if ($request->filled('queue')) {
-			$filters['queue'] = (string) $request->input('queue');
-		}
+        if (! empty($validated['status'])) {
+            $filters['status'] = $validated['status'];
+        }
 
-		if ($request->filled('search')) {
-			$filters['name'] = (string) $request->input('search');
-		}
+        if (! empty($validated['connection'])) {
+            $filters['connection'] = $validated['connection'];
+        }
 
-		$paginator = $jobs->paginate($filters, $perPage);
+        if (! empty($validated['queue'])) {
+            $filters['queue'] = $validated['queue'];
+        }
 
-		return response()->json([
-			'data' => $paginator->items(),
-			'meta' => [
-				'current_page' => $paginator->currentPage(),
-				'last_page' => $paginator->lastPage(),
-				'per_page' => $paginator->perPage(),
-				'total' => $paginator->total(),
-			],
-		]);
-	}
+        if (! empty($validated['search'])) {
+            $filters['name'] = $validated['search'];
+        }
 
-	public function job(Request $request, string $id, JobRepository $jobs): JsonResponse
-	{
-		$job = $jobs->find($id);
+        $paginator = $jobs->paginate($filters, $perPage);
 
-		if ($job === null) {
-			return response()->json([
-				'message' => "Cauce job [{$id}] not found.",
-			], 404);
-		}
+        return response()->json([
+            'data' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
+    }
 
-		return response()->json([
-			'data' => $job,
-		]);
-	}
+    public function job(Request $request, string $id, JobRepository $jobs): JsonResponse
+    {
+        $job = $jobs->find($id);
 
-	public function retry(Request $request, string $id, JobRepository $jobs): JsonResponse
-	{
-		$job = $jobs->find($id);
+        if ($job === null) {
+            return response()->json([
+                'message' => "Cauce job [{$id}] not found.",
+            ], 404);
+        }
 
-		if ($job === null) {
-			return response()->json([
-				'message' => "Cauce job [{$id}] not found.",
-			], 404);
-		}
+        return response()->json([
+            'data' => $job,
+        ]);
+    }
 
-		$success = $jobs->retry($id);
+    public function retry(Request $request, string $id, JobRepository $jobs): JsonResponse
+    {
+        $job = $jobs->find($id);
 
-		if (! $success) {
-			return response()->json([
-				'message' => 'Job could not be retried.',
-			], 422);
-		}
+        if ($job === null) {
+            return response()->json([
+                'message' => "Cauce job [{$id}] not found.",
+            ], 404);
+        }
 
-		return response()->json([
-			'data' => $jobs->find($id),
-			'message' => 'Job re-queued.',
-		]);
-	}
+        $success = $jobs->retry($id);
 
-	public function delete(Request $request, string $id, JobRepository $jobs): JsonResponse
-	{
-		$job = $jobs->find($id);
+        if (! $success) {
+            return response()->json([
+                'message' => 'Job could not be retried.',
+            ], 422);
+        }
 
-		if ($job === null) {
-			return response()->json([
-				'message' => "Cauce job [{$id}] not found.",
-			], 404);
-		}
+        return response()->json([
+            'data' => $jobs->find($id),
+            'message' => 'Job re-queued.',
+        ]);
+    }
 
-		$jobs->delete($id);
+    public function delete(Request $request, string $id, JobRepository $jobs): JsonResponse
+    {
+        $job = $jobs->find($id);
 
-		return response()->json([
-			'message' => 'Job deleted.',
-		]);
-	}
+        if ($job === null) {
+            return response()->json([
+                'message' => "Cauce job [{$id}] not found.",
+            ], 404);
+        }
 
-	public function failed(Request $request, JobRepository $jobs): JsonResponse
-	{
-		$perPage = (int) $request->input('per_page', 25);
+        $jobs->delete($id);
 
-		$paginator = $jobs->failed($perPage);
+        return response()->json([
+            'message' => 'Job deleted.',
+        ]);
+    }
 
-		return response()->json([
-			'data' => $paginator->items(),
-			'meta' => [
-				'current_page' => $paginator->currentPage(),
-				'last_page' => $paginator->lastPage(),
-				'per_page' => $paginator->perPage(),
-				'total' => $paginator->total(),
-			],
-		]);
-	}
+    public function failed(Request $request, JobRepository $jobs): JsonResponse
+    {
+        $validated = $request->validate([
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:500'],
+        ]);
+
+        $perPage = (int) ($validated['per_page'] ?? 25);
+
+        $paginator = $jobs->failed($perPage);
+
+        return response()->json([
+            'data' => $paginator->items(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
+    }
 
     public function metrics(Request $request, MetricsRepository $metrics): JsonResponse
     {
-        $hours = (int) $request->input('hours', 24);
+        $validated = $request->validate([
+            'hours' => ['sometimes', 'integer', 'min:1', 'max:720'],
+        ]);
+
+        $hours = (int) ($validated['hours'] ?? 24);
         $from = CarbonImmutable::now()->subHours($hours);
         $to = CarbonImmutable::now();
 
@@ -172,6 +192,17 @@ class ApiController extends Controller
             }
         } catch (\Throwable) {
             $checks['circuit_breakers'] = 'error';
+        }
+
+        if ((bool) config('cauce.health.check_queue', false)) {
+            try {
+                $queue = \Illuminate\Support\Facades\Queue::connection();
+                $queue->size();
+                $checks['queue'] = 'ok';
+            } catch (\Throwable) {
+                $checks['queue'] = 'error';
+                $status = $status === 'ok' ? 'degraded' : $status;
+            }
         }
 
         $httpCode = match ($status) {

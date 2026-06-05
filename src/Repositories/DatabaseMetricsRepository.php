@@ -63,6 +63,10 @@ class DatabaseMetricsRepository implements MetricsRepository
 
     protected function incrementUpsert(string $connection, string $queue, \DateTimeImmutable $minute, string $metric, float $value, ?int $runtimeMs): void
     {
+        // Uses pessimistic locking (SELECT ... FOR UPDATE) to ensure atomicity
+        // across non-MySQL databases. Under extreme write loads (>10k ops/sec
+        // on the same bucket) this may become a bottleneck. MySQL users get
+        // the lock-free ON DUPLICATE KEY UPDATE path above.
         $this->connection->transaction(function () use ($connection, $queue, $minute, $metric, $value, $runtimeMs) {
             $existing = $this->connection->table($this->table)
                 ->where('connection', $connection)

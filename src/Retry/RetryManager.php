@@ -6,6 +6,7 @@ namespace Marmol89\Cauce\Retry;
 
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Marmol89\Cauce\Attributes\Retry as RetryAttribute;
 use Marmol89\Cauce\Contracts\RetryStrategy;
 use ReflectionClass;
@@ -22,18 +23,27 @@ class RetryManager
      */
     public function forJob(object|string $job): ?RetryStrategy
     {
-        $class = is_object($job) ? $job::class : $job;
+        try {
+            $class = is_object($job) ? $job::class : $job;
 
-        $attribute = $this->resolveAttribute($class);
+            $attribute = $this->resolveAttribute($class);
 
-        if ($attribute === null) {
-            return $this->resolveDefault();
+            if ($attribute === null) {
+                return $this->resolveDefault();
+            }
+
+            $strategyClass = $attribute->strategy;
+            $args = $this->buildArgs($attribute, $strategyClass);
+
+            return $this->container->make($strategyClass, $args);
+        } catch (\Throwable $e) {
+            Log::warning('Cauce: failed to resolve retry strategy', [
+                'job' => is_object($job) ? $job::class : $job,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
         }
-
-        $strategyClass = $attribute->strategy;
-        $args = $this->buildArgs($attribute, $strategyClass);
-
-        return $this->container->make($strategyClass, $args);
     }
 
     /**
@@ -83,29 +93,37 @@ class RetryManager
 
     protected function resolveDefault(): ?RetryStrategy
     {
-        $class = (string) config('cauce.retry.default_strategy');
+        try {
+            $class = (string) config('cauce.retry.default_strategy');
 
-        if ($class === '') {
+            if ($class === '') {
+                return null;
+            }
+
+            $globalMax = config('cauce.retry.global_max_attempts');
+
+            if (is_a($class, CircuitBreaker::class, true)) {
+                $args = [
+                    'threshold' => (int) config('cauce.retry.default_threshold', 5),
+                    'cooldown' => (int) config('cauce.retry.default_cooldown', 60),
+                    'maxAttempts' => $globalMax ?? 5,
+                    'key' => config('cauce.retry.default_breaker_key', 'default'),
+                ];
+            } else {
+                $args = [
+                    'maxAttempts' => $globalMax ?? 5,
+                    'base' => (int) config('cauce.retry.default_base', 1),
+                    'cap' => (int) config('cauce.retry.default_cap', 300),
+                ];
+            }
+
+            return $this->container->make($class, $args);
+        } catch (\Throwable $e) {
+            Log::warning('Cauce: failed to resolve default retry strategy', [
+                'error' => $e->getMessage(),
+            ]);
+
             return null;
         }
-
-        $globalMax = config('cauce.retry.global_max_attempts');
-
-        if (is_a($class, CircuitBreaker::class, true)) {
-            $args = [
-                'threshold' => (int) config('cauce.retry.default_threshold', 5),
-                'cooldown' => (int) config('cauce.retry.default_cooldown', 60),
-                'maxAttempts' => $globalMax ?? 5,
-                'key' => config('cauce.retry.default_breaker_key', 'default'),
-            ];
-        } else {
-            $args = [
-                'maxAttempts' => $globalMax ?? 5,
-                'base' => (int) config('cauce.retry.default_base', 1),
-                'cap' => (int) config('cauce.retry.default_cap', 300),
-            ];
-        }
-
-        return $this->container->make($class, $args);
     }
 }

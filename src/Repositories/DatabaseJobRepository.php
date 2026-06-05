@@ -10,6 +10,7 @@ use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Marmol89\Cauce\Contracts\JobRepository;
 use Marmol89\Cauce\Events\JobRetried;
@@ -127,25 +128,37 @@ class DatabaseJobRepository implements JobRepository
 
     public function find(string $cauceId): ?object
     {
-        $row = $this->connection->table($this->table)
-            ->where('id', $cauceId)
-            ->first();
+        try {
+            $row = $this->connection->table($this->table)
+                ->where('id', $cauceId)
+                ->first();
 
-        if ($row === null) {
+            if ($row === null) {
+                return null;
+            }
+
+            return $this->decodeJsonColumns($row);
+        } catch (\Throwable $e) {
+            Log::warning('Cauce: failed to find job', ['id' => $cauceId, 'error' => $e->getMessage()]);
+
             return null;
         }
-
-        return $this->decodeJsonColumns($row);
     }
 
     public function findIdByUuid(string $uuid): ?string
     {
-        $id = $this->connection->table($this->table)
-            ->where('uuid', $uuid)
-            ->orderByDesc('id')
-            ->value('id');
+        try {
+            $id = $this->connection->table($this->table)
+                ->where('uuid', $uuid)
+                ->orderByDesc('id')
+                ->value('id');
 
-        return $id !== null ? (string) $id : null;
+            return $id !== null ? (string) $id : null;
+        } catch (\Throwable $e) {
+            Log::warning('Cauce: failed to find job by UUID', ['uuid' => $uuid, 'error' => $e->getMessage()]);
+
+            return null;
+        }
     }
 
     public function findRowByUuid(string $uuid): ?object
@@ -164,31 +177,43 @@ class DatabaseJobRepository implements JobRepository
 
     public function paginate(array $filters = [], int $perPage = 25): LengthAwarePaginator
     {
-        $query = $this->connection->table($this->table)->orderByDesc('id');
+        try {
+            $query = $this->connection->table($this->table)->orderByDesc('id');
 
-        $this->applyFilters($query, $filters);
+            $this->applyFilters($query, $filters);
 
-        $paginator = $query->paginate($perPage);
+            $paginator = $query->paginate($perPage);
 
-        $paginator->setCollection(
-            $paginator->getCollection()->map(fn ($row) => $this->decodeJsonColumns($row))
-        );
+            $paginator->setCollection(
+                $paginator->getCollection()->map(fn ($row) => $this->decodeJsonColumns($row))
+            );
 
-        return $paginator;
+            return $paginator;
+        } catch (\Throwable $e) {
+            Log::warning('Cauce: failed to paginate jobs', ['filters' => array_keys($filters), 'error' => $e->getMessage()]);
+
+            return new \Illuminate\Pagination\LengthAwarePaginator([], 0, $perPage);
+        }
     }
 
     public function failed(int $perPage = 25): LengthAwarePaginator
     {
-        $paginator = $this->connection->table($this->table)
-            ->where('status', 'failed')
-            ->orderByDesc('failed_at')
-            ->paginate($perPage);
+        try {
+            $paginator = $this->connection->table($this->table)
+                ->where('status', 'failed')
+                ->orderByDesc('failed_at')
+                ->paginate($perPage);
 
-        $paginator->setCollection(
-            $paginator->getCollection()->map(fn ($row) => $this->decodeJsonColumns($row))
-        );
+            $paginator->setCollection(
+                $paginator->getCollection()->map(fn ($row) => $this->decodeJsonColumns($row))
+            );
 
-        return $paginator;
+            return $paginator;
+        } catch (\Throwable $e) {
+            Log::warning('Cauce: failed to paginate failed jobs', ['error' => $e->getMessage()]);
+
+            return new \Illuminate\Pagination\LengthAwarePaginator([], 0, $perPage);
+        }
     }
 
     public function retry(string $cauceId, ?string $connection = null, ?string $queue = null): bool
@@ -293,62 +318,93 @@ class DatabaseJobRepository implements JobRepository
 
     public function countsByStatus(int $hours = 24): Collection
     {
-        return $this->connection->table($this->table)
-            ->select('status', $this->connection->raw('COUNT(*) as total'))
-            ->where('created_at', '>=', now()->subHours($hours))
-            ->groupBy('status')
-            ->get()
-            ->pluck('total', 'status');
+        try {
+            return $this->connection->table($this->table)
+                ->select('status', $this->connection->raw('COUNT(*) as total'))
+                ->where('created_at', '>=', now()->subHours($hours))
+                ->groupBy('status')
+                ->get()
+                ->pluck('total', 'status');
+        } catch (\Throwable $e) {
+            Log::warning('Cauce: failed to count jobs by status', ['hours' => $hours, 'error' => $e->getMessage()]);
+
+            return collect();
+        }
     }
 
     public function countsByConnection(int $hours = 24): Collection
     {
-        return $this->connection->table($this->table)
-            ->select('connection', $this->connection->raw('COUNT(*) as total'))
-            ->where('created_at', '>=', now()->subHours($hours))
-            ->groupBy('connection')
-            ->get()
-            ->pluck('total', 'connection');
+        try {
+            return $this->connection->table($this->table)
+                ->select('connection', $this->connection->raw('COUNT(*) as total'))
+                ->where('created_at', '>=', now()->subHours($hours))
+                ->groupBy('connection')
+                ->get()
+                ->pluck('total', 'connection');
+        } catch (\Throwable $e) {
+            Log::warning('Cauce: failed to count jobs by connection', ['hours' => $hours, 'error' => $e->getMessage()]);
+
+            return collect();
+        }
     }
 
     public function countsByQueue(int $hours = 24): Collection
     {
-        return $this->connection->table($this->table)
-            ->select('connection', 'queue', $this->connection->raw('COUNT(*) as total'))
-            ->where('created_at', '>=', now()->subHours($hours))
-            ->groupBy('connection', 'queue')
-            ->get()
-            ->mapWithKeys(function ($row) {
-                return [sprintf('%s::%s', $row->connection, $row->queue) => (int) $row->total];
-            });
+        try {
+            return $this->connection->table($this->table)
+                ->select('connection', 'queue', $this->connection->raw('COUNT(*) as total'))
+                ->where('created_at', '>=', now()->subHours($hours))
+                ->groupBy('connection', 'queue')
+                ->get()
+                ->mapWithKeys(function ($row) {
+                    return [sprintf('%s::%s', $row->connection, $row->queue) => (int) $row->total];
+                });
+        } catch (\Throwable $e) {
+            Log::warning('Cauce: failed to count jobs by queue', ['hours' => $hours, 'error' => $e->getMessage()]);
+
+            return collect();
+        }
     }
 
     public function distinctConnections(): Collection
     {
-        return $this->connection->table($this->table)
-            ->select('connection')
-            ->distinct()
-            ->orderBy('connection')
-            ->pluck('connection');
+        try {
+            return $this->connection->table($this->table)
+                ->select('connection')
+                ->distinct()
+                ->orderBy('connection')
+                ->pluck('connection');
+        } catch (\Throwable $e) {
+            Log::warning('Cauce: failed to get distinct connections', ['error' => $e->getMessage()]);
+
+            return collect();
+        }
     }
 
     public function distinctQueues(): Collection
     {
-        return $this->connection->table($this->table)
-            ->select('queue')
-            ->distinct()
-            ->orderBy('queue')
-            ->pluck('queue');
+        try {
+            return $this->connection->table($this->table)
+                ->select('queue')
+                ->distinct()
+                ->orderBy('queue')
+                ->pluck('queue');
+        } catch (\Throwable $e) {
+            Log::warning('Cauce: failed to get distinct queues', ['error' => $e->getMessage()]);
+
+            return collect();
+        }
     }
 
     public function distinctTags(): Collection
     {
         return Cache::remember('cauce:distinct_tags', 300, function () {
+            $limit = (int) config('cauce.dashboard.tags_fetch_limit', 1000);
             $rows = $this->connection->table($this->table)
                 ->whereNotNull('tags')
                 ->select('tags')
                 ->distinct()
-                ->limit(1000)
+                ->limit($limit)
                 ->get();
 
             $tags = [];

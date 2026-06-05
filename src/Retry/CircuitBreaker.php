@@ -9,8 +9,17 @@ use Marmol89\Cauce\Contracts\RetryStrategy;
 use Marmol89\Cauce\Events\CircuitBreakerClosed;
 use Marmol89\Cauce\Events\CircuitBreakerHalfOpened;
 use Marmol89\Cauce\Events\CircuitBreakerOpened;
-use Marmol89\Cauce\Support\AlertManager;
 
+/**
+ * Thread-safe circuit breaker backed by the database.
+ *
+ * State transitions use pessimistic row locking (SELECT ... FOR UPDATE inside
+ * a transaction) to prevent race conditions when multiple workers process jobs
+ * sharing the same circuit breaker key. This serializes concurrent transitions,
+ * which is correct but may become a bottleneck if thousands of workers compete
+ * for the same key simultaneously. Tune the threshold and cooldown so the
+ * breaker trips early enough to reduce contention.
+ */
 class CircuitBreaker implements RetryStrategy
 {
     public const STATE_CLOSED = 'closed';

@@ -7,6 +7,7 @@ namespace Marmol89\Cauce\Http\Middleware;
 use Closure;
 use Illuminate\Contracts\Auth\Access\Gate;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class Authorize
@@ -23,7 +24,10 @@ class Authorize
         if ($user === null) {
             try {
                 $user = $request->user('api');
-            } catch (\InvalidArgumentException) {
+            } catch (\InvalidArgumentException $e) {
+                Log::debug('Cauce: failed to resolve API user in Authorize middleware', [
+                    'error' => $e->getMessage(),
+                ]);
                 $user = null;
             }
         }

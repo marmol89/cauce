@@ -151,10 +151,18 @@ class CauceServiceProvider extends ServiceProvider
 
         Route::group([
             'domain' => $this->app['config']->get('cauce.domain'),
-            'prefix' => $this->app['config']->get('cauce.path', 'cauce') . '/api',
+            'prefix' => $this->app['config']->get('cauce.path', 'cauce') . '/api/v1',
             'middleware' => ['api', \Marmol89\Cauce\Http\Middleware\Authorize::class, 'throttle:120,1'],
         ], function (): void {
             $this->loadRoutesFrom(__DIR__ . '/../routes/api.php');
+        });
+
+        Route::group([
+            'domain' => $this->app['config']->get('cauce.domain'),
+            'prefix' => $this->app['config']->get('cauce.path', 'cauce') . '/api',
+            'middleware' => ['api', 'throttle:30,1'],
+        ], function (): void {
+            Route::get('health', [\Marmol89\Cauce\Http\Controllers\ApiController::class, 'health']);
         });
     }
 
@@ -199,6 +207,10 @@ class CauceServiceProvider extends ServiceProvider
 
     protected function bootEventListeners(): void
     {
+        // Listeners are registered once at boot and remain active for the
+        // entire application lifecycle. Toggling cauce.enabled at runtime
+        // does not remove already-registered listeners; a full restart is
+        // required.
         if (! $this->app['config']->get('cauce.enabled', true)) {
             return;
         }
@@ -212,15 +224,39 @@ class CauceServiceProvider extends ServiceProvider
 
     protected function bootGate(): void
     {
-        $allowed = fn ($user = null): bool =>
-            $this->app->environment('local', 'testing', 'staging', 'development')
-            || $this->app['config']->get('cauce.allow_production', false);
+        $allowed = function ($user = null): bool {
+            $envAllowed = $this->app->environment('local', 'testing', 'staging', 'development')
+                || $this->app['config']->get('cauce.allow_production', false);
+
+            if (! $envAllowed) {
+                return false;
+            }
+
+            if ($this->app['config']->get('cauce.require_authentication', false) && $user === null) {
+                return false;
+            }
+
+            $callback = $this->app['config']->get('cauce.authorization_callback');
+
+            if ($user !== null && is_callable($callback)) {
+                return (bool) $callback($user);
+            }
+
+            return true;
+        };
 
         Gate::define('viewCauce', $allowed);
 
         Gate::define('mutateCauce', function ($user = null) use ($allowed): bool {
-            return $allowed($user)
-                && $this->app['config']->get('cauce.allow_production_mutate', false) !== false;
+            if (! $allowed($user)) {
+                return false;
+            }
+
+            if ($this->app->environment('local', 'testing', 'staging', 'development')) {
+                return true;
+            }
+
+            return $this->app['config']->get('cauce.allow_production_mutate', false) !== false;
         });
     }
 
@@ -232,5 +268,13 @@ class CauceServiceProvider extends ServiceProvider
         $resolver = $app['db'];
 
         return $resolver->connection($name);
+    }
+
+    /**
+     * Cleanup after the request lifecycle.
+     */
+    public function terminate(): void
+    {
+        // Reserved for future cleanup: flush caches, close connections, etc.
     }
 }

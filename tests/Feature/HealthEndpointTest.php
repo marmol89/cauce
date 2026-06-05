@@ -19,7 +19,7 @@ class HealthEndpointTest extends TestCase
         $router->get('cauce/api/health', [
             \Marmol89\Cauce\Http\Controllers\ApiController::class,
             'health',
-        ])->middleware(['web']);
+        ])->middleware(['api']);
     }
 
     public function test_health_returns_200_when_db_is_ok(): void

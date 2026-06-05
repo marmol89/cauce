@@ -46,6 +46,34 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Authentication requirement
+    |--------------------------------------------------------------------------
+    |
+    | When true, Cauce requires an authenticated user to pass the Gate, even
+    | in development environments. In production you should enable this or
+    | provide your own authorization_callback.
+    |
+    */
+
+    'require_authentication' => env('CAUCE_REQUIRE_AUTH', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authorization callback
+    |--------------------------------------------------------------------------
+    |
+    | A callable that receives the authenticated user and returns a boolean.
+    | Use this to implement role-based or permission-based access control
+    | on top of the environment check. Example:
+    |
+    |   'authorization_callback' => fn ($user) => $user->isAdmin(),
+    |
+    */
+
+    'authorization_callback' => null,
+
+    /*
+    |--------------------------------------------------------------------------
     | Middleware
     |--------------------------------------------------------------------------
     |
@@ -151,6 +179,7 @@ return [
         'refresh_hours' => env('CAUCE_DASHBOARD_REFRESH_HOURS', 24),
         'rows_per_page' => env('CAUCE_DASHBOARD_ROWS', 25),
         'css_source' => env('CAUCE_CSS_SOURCE', 'cdn'),
+        'tags_fetch_limit' => env('CAUCE_TAGS_FETCH_LIMIT', 1000),
     ],
 
     /*
@@ -190,6 +219,34 @@ return [
         'enabled' => env('CAUCE_DLQ_ENABLED', false),
         'connection' => env('CAUCE_DLQ_CONNECTION', null),
         'queue' => env('CAUCE_DLQ_QUEUE', 'dead-letter'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Logging
+    |--------------------------------------------------------------------------
+    |
+    | Cauce logs soft failures (e.g. DB write failures, alert delivery errors)
+    | with the configured Laravel log channel. Set to null to use the default
+    | channel. All Cauce log messages are prefixed with "Cauce:" for easy
+    | filtering.
+    |
+    */
+
+    'log_channel' => env('CAUCE_LOG_CHANNEL', null),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Health check
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the health endpoint will also verify connectivity to the
+    | default queue connection. This adds a lightweight connection test.
+    |
+    */
+
+    'health' => [
+        'check_queue' => env('CAUCE_HEALTH_CHECK_QUEUE', false),
     ],
 
 ];

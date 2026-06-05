@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Marmol89\Cauce\Http\Livewire;
 
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Marmol89\Cauce\Contracts\JobRepository;
@@ -21,6 +22,8 @@ class QueueStats extends Component
 
     public function mount(): void
     {
+        Gate::authorize('viewCauce');
+
         $this->hours = (int) config('cauce.dashboard.refresh_hours', 24);
         $this->hours = max(1, min(168, $this->hours));
     }

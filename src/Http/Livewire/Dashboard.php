@@ -6,6 +6,7 @@ namespace Marmol89\Cauce\Http\Livewire;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -27,6 +28,8 @@ class Dashboard extends Component
 
     public function mount(): void
     {
+        Gate::authorize('viewCauce');
+
         $this->hours = (int) config('cauce.dashboard.refresh_hours', 24);
         $this->hours = max(1, min(168, $this->hours));
     }

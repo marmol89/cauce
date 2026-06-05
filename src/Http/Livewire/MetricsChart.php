@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marmol89\Cauce\Http\Livewire;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -30,6 +31,8 @@ class MetricsChart extends Component
 
     public function mount(): void
     {
+        Gate::authorize('viewCauce');
+
         $this->hours = max(1, min(168, $this->hours));
     }
 

@@ -66,7 +66,7 @@
         render('cauce-chart-throughput', 'throughput', null, '#6366f1');
         render('cauce-chart-runtime', 'runtime_avg_ms', null, '#f59e0b');
 
-        Livewire.on('cauce:refresh', () => {
+        $wire.on('cauce:refresh', () => {
             render('cauce-chart-processed', 'processed', null, '#10b981');
             render('cauce-chart-failed', 'failed', null, '#f43f5e');
             render('cauce-chart-throughput', 'throughput', null, '#6366f1');
