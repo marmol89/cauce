@@ -20,8 +20,15 @@ jobs:
         php: ['8.2', '8.3', '8.4']
         laravel: ['11.*', '12.*', '13.*']
         dependency-version: [prefer-lowest, prefer-stable]
+        include:
+          - laravel: '11.*'
+            testbench: '^9.0'
+          - laravel: '12.*'
+            testbench: '^10.0'
+          - laravel: '13.*'
+            testbench: '^11.0'
         exclude:
-          # Drop combinations that wouldn't work in the real world.
+          # Laravel 13 requires PHP 8.3+
           - { php: '8.2', laravel: '13.*' }
 
     steps:
@@ -46,9 +53,9 @@ jobs:
       - name: Validate composer.json
         run: composer validate --strict
 
-      - name: Require Laravel ${{ matrix.laravel }}
+      - name: Require Laravel ${{ matrix.laravel }} and testbench ${{ matrix.testbench }}
         run: |
-          composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:^9.0|^10.0" "livewire/livewire:^3.0" --no-update --no-interaction
+          composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" "livewire/livewire:^3.0" --no-update --no-interaction
 
       - name: Install dependencies
         run: |

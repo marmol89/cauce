@@ -135,15 +135,17 @@ class CauceServiceProvider extends ServiceProvider
 
     protected function registerLivewireComponents(): void
     {
-        if (! class_exists(\Livewire\Livewire::class)) {
+        if (! class_exists(\Livewire\LivewireManager::class)) {
             return;
         }
 
-        \Livewire\Livewire::component('cauce-dashboard', Dashboard::class);
-        \Livewire\Livewire::component('cauce-jobs-table', JobsTable::class);
-        \Livewire\Livewire::component('cauce-failed-jobs-table', FailedJobsTable::class);
-        \Livewire\Livewire::component('cauce-metrics-chart', MetricsChart::class);
-        \Livewire\Livewire::component('cauce-queue-stats', QueueStats::class);
+        $manager = $this->app->make(\Livewire\LivewireManager::class);
+
+        $manager->component('cauce-dashboard', Dashboard::class);
+        $manager->component('cauce-jobs-table', JobsTable::class);
+        $manager->component('cauce-failed-jobs-table', FailedJobsTable::class);
+        $manager->component('cauce-metrics-chart', MetricsChart::class);
+        $manager->component('cauce-queue-stats', QueueStats::class);
     }
 
     protected function bootCommands(): void

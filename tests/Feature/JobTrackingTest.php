@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Marmol89\Cauce\Tests\Feature;
 
+use Illuminate\Support\Facades\Queue;
 use Marmol89\Cauce\Contracts\JobRepository;
+use Marmol89\Cauce\Tests\Fixtures\TestJob;
 use Marmol89\Cauce\Tests\TestCase;
 
 class JobTrackingTest extends TestCase
@@ -123,19 +125,31 @@ class JobTrackingTest extends TestCase
 
     public function test_retry_resets_record(): void
     {
+        Queue::fake();
+
         $repo = app(JobRepository::class);
 
         $id = $repo->recordQueued([
             'uuid' => 'retry-1',
-            'connection' => 'database',
+            'connection' => config('queue.default'),
             'queue' => 'default',
-            'name' => 'App\\Jobs\\TestJob',
+            'name' => TestJob::class,
             'status' => 'queued',
             'queued_at' => now(),
+            'payload' => [
+                'uuid' => 'retry-1',
+                'displayName' => TestJob::class,
+                'job' => 'Illuminate\\Queue\\CallQueuedHandler@call',
+                'data' => [
+                    'commandName' => TestJob::class,
+                    'command' => serialize(new TestJob('boom')),
+                ],
+            ],
         ]);
         $repo->markFailed($id, 'boom');
 
         $this->assertTrue($repo->retry($id));
+
         $row = $repo->find($id);
         $this->assertSame('queued', $row->status);
         $this->assertNull($row->exception);
