@@ -14,6 +14,7 @@ return new class extends Migration
 
         Schema::connection($connection)->create('cauce_circuit_breakers', function (Blueprint $table): void {
             $table->string('key')->primary();
+            $table->string('state')->default('closed');
             $table->unsignedSmallInteger('failures')->default(0);
             $table->unsignedSmallInteger('threshold');
             $table->unsignedInteger('cooldown');

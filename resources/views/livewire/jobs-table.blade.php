@@ -1,20 +1,19 @@
 <div>
     <div class="cauce-card mb-4">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
             <input type="text" wire:model.live.debounce.300ms="search" placeholder="Search by class..."
                 class="rounded border-slate-200 text-sm focus:ring-indigo-500 focus:border-indigo-500">
             <select wire:model.live="connection" class="rounded border-slate-200 text-sm focus:ring-indigo-500 focus:border-indigo-500">
                 <option value="">All connections</option>
-                <option value="redis">redis</option>
-                <option value="database">database</option>
-                <option value="sqs">sqs</option>
-                <option value="beanstalkd">beanstalkd</option>
+                @foreach($this->connections as $conn)
+                    <option value="{{ $conn }}">{{ $conn }}</option>
+                @endforeach
             </select>
             <select wire:model.live="queue" class="rounded border-slate-200 text-sm focus:ring-indigo-500 focus:border-indigo-500">
                 <option value="">All queues</option>
-                <option value="default">default</option>
-                <option value="high">high</option>
-                <option value="low">low</option>
+                @foreach($this->queues as $q)
+                    <option value="{{ $q }}">{{ $q }}</option>
+                @endforeach
             </select>
             <select wire:model.live="status" class="rounded border-slate-200 text-sm focus:ring-indigo-500 focus:border-indigo-500">
                 <option value="">All statuses</option>
@@ -23,6 +22,12 @@
                 <option value="completed">Completed</option>
                 <option value="retrying">Retrying</option>
                 <option value="failed">Failed</option>
+            </select>
+            <select wire:model.live="tag" class="rounded border-slate-200 text-sm focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="">All tags</option>
+                @foreach($this->availableTags as $t)
+                    <option value="{{ $t }}">{{ $t }}</option>
+                @endforeach
             </select>
         </div>
     </div>

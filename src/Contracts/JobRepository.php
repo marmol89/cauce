@@ -24,11 +24,13 @@ interface JobRepository
 
     public function findIdByUuid(string $uuid): ?string;
 
+    public function findRowByUuid(string $uuid): ?object;
+
     public function paginate(array $filters = [], int $perPage = 25): LengthAwarePaginator;
 
     public function failed(int $perPage = 25): LengthAwarePaginator;
 
-    public function retry(string $cauceId): bool;
+    public function retry(string $cauceId, ?string $connection = null, ?string $queue = null): bool;
 
     public function delete(string $cauceId): bool;
 
@@ -41,4 +43,10 @@ interface JobRepository
     public function countsByConnection(int $hours = 24): Collection;
 
     public function countsByQueue(int $hours = 24): Collection;
+
+    public function distinctConnections(): Collection;
+
+    public function distinctQueues(): Collection;
+
+    public function distinctTags(): Collection;
 }

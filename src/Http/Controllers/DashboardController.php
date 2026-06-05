@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Marmol89\Cauce\Http\Controllers;
 
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Marmol89\Cauce\Contracts\JobRepository;
@@ -11,17 +13,17 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): View
     {
         return view('cauce::dashboard');
     }
 
-    public function jobs(Request $request)
+    public function jobs(Request $request): View
     {
         return view('cauce::jobs.index');
     }
 
-    public function job(Request $request, string $id, JobRepository $jobs)
+    public function job(Request $request, string $id, JobRepository $jobs): View
     {
         $job = $jobs->find($id);
 
@@ -32,7 +34,7 @@ class DashboardController extends Controller
         return view('cauce::jobs.show', ['job' => $job]);
     }
 
-    public function jobAction(Request $request, string $id, JobRepository $jobs)
+    public function jobAction(Request $request, string $id, JobRepository $jobs): RedirectResponse
     {
         $action = (string) $request->input('_action');
 
@@ -46,17 +48,17 @@ class DashboardController extends Controller
         };
     }
 
-    public function failed(Request $request)
+    public function failed(Request $request): View
     {
         return view('cauce::failed.index');
     }
 
-    public function metrics(Request $request)
+    public function metrics(Request $request): View
     {
         return view('cauce::metrics.index');
     }
 
-    public function queues(Request $request)
+    public function queues(Request $request): View
     {
         return view('cauce::queues.index');
     }

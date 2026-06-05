@@ -26,11 +26,14 @@ class JobsTable extends Component
     #[Url]
     public string $status = '';
 
+    #[Url]
+    public string $tag = '';
+
     public int $perPage;
 
     public function mount(): void
     {
-        $this->perPage = (int) config('cauce.dashboard.rows_per_page', 25);
+        $this->perPage = max(5, min(100, (int) config('cauce.dashboard.rows_per_page', 25)));
     }
 
     public function render()
@@ -47,13 +50,33 @@ class JobsTable extends Component
                 'connection' => $this->connection,
                 'queue' => $this->queue,
                 'status' => $this->status,
+                'tags' => $this->tag !== '' ? [$this->tag] : null,
             ], fn ($v) => $v !== ''),
             $this->perPage,
         );
     }
 
+    #[Computed]
+    public function connections()
+    {
+        return app(JobRepository::class)->distinctConnections();
+    }
+
+    #[Computed]
+    public function queues()
+    {
+        return app(JobRepository::class)->distinctQueues();
+    }
+
+    #[Computed]
+    public function availableTags()
+    {
+        return app(JobRepository::class)->distinctTags();
+    }
+
     public function updatedSearch(): void
     {
+        $this->search = mb_substr($this->search, 0, 255);
         $this->resetPage();
     }
 
@@ -68,6 +91,11 @@ class JobsTable extends Component
     }
 
     public function updatedStatus(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedTag(): void
     {
         $this->resetPage();
     }

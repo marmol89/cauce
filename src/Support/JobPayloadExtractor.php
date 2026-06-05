@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Marmol89\Cauce\Support;
 
 use Illuminate\Queue\Events\JobFailed;
-use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobQueued;
 use Symfony\Component\Uid\Ulid;
 
@@ -26,6 +25,8 @@ class JobPayloadExtractor
 
         return [
             'uuid' => $payload['uuid'] ?? ($event->id !== null ? (string) $event->id : $this->ulid()),
+            'batch_id' => $payload['batchId'] ?? null,
+            'chain_id' => $payload['chainId'] ?? null,
             'connection' => $event->connectionName,
             'queue' => $event->queue ?: 'default',
             'name' => $payload['displayName'] ?? $this->resolveJobName($event->job),
@@ -33,28 +34,6 @@ class JobPayloadExtractor
             'tags' => $this->resolveTags($event->job),
             'queued_at' => now(),
             'status' => 'queued',
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function fromProcessing(\Illuminate\Queue\Events\JobProcessing $event): array
-    {
-        return [
-            'started_at' => now(),
-            'status' => 'processing',
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function fromProcessed(JobProcessed $event): array
-    {
-        return [
-            'status' => 'completed',
-            'finished_at' => now(),
         ];
     }
 
@@ -109,11 +88,13 @@ class JobPayloadExtractor
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|null
      */
-    protected function safePayload(array $payload, int $maxSize): bool|array
+    protected function safePayload(array $payload, int $maxSize): bool|array|null
     {
         if (! (bool) config('cauce.monitoring.store_payload', true)) {
             return null;
         }
+
+        $payload = $this->redactFields($payload);
 
         $encoded = json_encode($payload, JSON_UNESCAPED_UNICODE);
 
@@ -122,6 +103,30 @@ class JobPayloadExtractor
         }
 
         return $payload;
+    }
+
+    protected function redactFields(array $data, string $path = ''): array
+    {
+        $sensitive = config('cauce.monitoring.redacted_fields', []);
+
+        if ($sensitive === []) {
+            return $data;
+        }
+
+        foreach ($data as $key => $value) {
+            foreach ($sensitive as $pattern) {
+                if (stripos((string) $key, $pattern) !== false) {
+                    $data[$key] = '[REDACTED]';
+                    continue 2;
+                }
+            }
+
+            if (is_array($value)) {
+                $data[$key] = $this->redactFields($value, $path . '.' . $key);
+            }
+        }
+
+        return $data;
     }
 
     protected function normalizeException(?\Throwable $exception): ?string

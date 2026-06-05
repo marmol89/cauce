@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Marmol89\Cauce\Retry;
 
-use Illuminate\Contracts\Cache\Repository as Cache;
+use Illuminate\Database\ConnectionInterface;
 use Marmol89\Cauce\Contracts\RetryStrategy;
+use Marmol89\Cauce\Support\AlertManager;
 
 class CircuitBreaker implements RetryStrategy
 {
@@ -13,13 +14,14 @@ class CircuitBreaker implements RetryStrategy
     public const STATE_OPEN = 'open';
     public const STATE_HALF_OPEN = 'half_open';
 
+    protected ?ConnectionInterface $connection = null;
+
     public function __construct(
         protected int $threshold = 5,
         protected int $cooldown = 60,
         protected int $maxAttempts = 5,
         protected int $base = 1,
         protected ?string $key = null,
-        protected ?Cache $cache = null,
     ) {
     }
 
@@ -40,19 +42,19 @@ class CircuitBreaker implements RetryStrategy
 
     public function key(): string
     {
-        return 'cauce:circuit:' . ($this->key ?? 'default');
+        return $this->key ?? 'default';
     }
 
     public function state(): string
     {
-        $data = $this->getState();
+        $row = $this->getRow();
 
-        if ($data === null) {
+        if ($row === null) {
             return self::STATE_CLOSED;
         }
 
-        if ($data['state'] === self::STATE_OPEN) {
-            $openedAt = strtotime((string) $data['opened_at']);
+        if ($row->state === self::STATE_OPEN) {
+            $openedAt = strtotime((string) $row->opened_at);
             if ($openedAt !== false && (time() - $openedAt) >= $this->cooldown) {
                 $this->transitionTo(self::STATE_HALF_OPEN);
 
@@ -60,7 +62,7 @@ class CircuitBreaker implements RetryStrategy
             }
         }
 
-        return (string) $data['state'];
+        return (string) $row->state;
     }
 
     public function allows(): bool
@@ -70,84 +72,120 @@ class CircuitBreaker implements RetryStrategy
 
     public function recordSuccess(): void
     {
-        $data = $this->getState();
+        $row = $this->getRow();
 
-        if ($data !== null && $data['state'] === self::STATE_HALF_OPEN) {
+        if ($row !== null && $row->state === self::STATE_HALF_OPEN) {
             $this->transitionTo(self::STATE_CLOSED);
         }
 
-        $this->saveState([
+        $this->upsertRow([
             'state' => self::STATE_CLOSED,
             'failures' => 0,
             'opened_at' => null,
             'half_open_at' => null,
-            'closed_at' => now()->toDateTimeString(),
+            'closed_at' => now(),
         ]);
     }
 
     public function recordFailure(): void
     {
-        $data = $this->getState() ?? [
-            'state' => self::STATE_CLOSED,
-            'failures' => 0,
-            'opened_at' => null,
-            'half_open_at' => null,
-            'closed_at' => null,
+        $row = $this->getRow();
+
+        $failures = $row !== null ? (int) $row->failures + 1 : 1;
+        $state = $row !== null ? (string) $row->state : self::STATE_CLOSED;
+
+        $data = [
+            'state' => $state,
+            'failures' => $failures,
+            'opened_at' => $row->opened_at ?? null,
+            'half_open_at' => $row->half_open_at ?? null,
+            'closed_at' => $row->closed_at ?? null,
         ];
 
-        $data['failures'] = (int) $data['failures'] + 1;
-
-        if ($data['failures'] >= $this->threshold) {
-            $this->transitionTo(self::STATE_OPEN);
+        if ($failures >= $this->threshold) {
             $data['state'] = self::STATE_OPEN;
-            $data['opened_at'] = now()->toDateTimeString();
+            $data['opened_at'] = now();
         }
 
-        $this->saveState($data);
+        $this->upsertRow($data);
+
+        if ($data['state'] === self::STATE_OPEN && $data['failures'] === $this->threshold) {
+            if (app()->bound(AlertManager::class)) {
+                app(AlertManager::class)->notifyCircuitBreakerOpen($this->key());
+            }
+        }
     }
 
     public function reset(): void
     {
-        $this->cache()->forget($this->key());
+        $this->connection()->table('cauce_circuit_breakers')
+            ->where('key', $this->key())
+            ->delete();
     }
 
     protected function transitionTo(string $state): void
     {
-        $data = $this->getState() ?? [
+        $row = $this->getRow();
+
+        $data = [
             'state' => $state,
-            'failures' => 0,
-            'opened_at' => null,
-            'half_open_at' => null,
-            'closed_at' => null,
+            'failures' => $row->failures ?? 0,
+            'opened_at' => $row->opened_at ?? null,
+            'half_open_at' => $row->half_open_at ?? null,
+            'closed_at' => $row->closed_at ?? null,
         ];
 
-        $data['state'] = $state;
-        $data['half_open_at'] = $state === self::STATE_HALF_OPEN ? now()->toDateTimeString() : null;
-        $data['closed_at'] = $state === self::STATE_CLOSED ? now()->toDateTimeString() : null;
+        if ($state === self::STATE_HALF_OPEN) {
+            $data['half_open_at'] = now();
+        }
 
-        $this->saveState($data);
+        if ($state === self::STATE_CLOSED) {
+            $data['closed_at'] = now();
+        }
+
+        $this->upsertRow($data);
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
-    protected function getState(): ?array
+    protected function getRow(): ?object
     {
-        $value = $this->cache()->get($this->key());
-
-        return is_array($value) ? $value : null;
+        return $this->connection()->table('cauce_circuit_breakers')
+            ->where('key', $this->key())
+            ->first();
     }
 
-    /**
-     * @param array<string, mixed> $data
-     */
-    protected function saveState(array $data): void
+    protected function upsertRow(array $data): void
     {
-        $this->cache()->put($this->key(), $data, now()->addDays(7));
+        $data['threshold'] = $this->threshold;
+        $data['cooldown'] = $this->cooldown;
+        $data['updated_at'] = now();
+
+        $exists = $this->connection()->table('cauce_circuit_breakers')
+            ->where('key', $this->key())
+            ->exists();
+
+        if ($exists) {
+            $this->connection()->table('cauce_circuit_breakers')
+                ->where('key', $this->key())
+                ->update($data);
+        } else {
+            $data['key'] = $this->key();
+            $data['created_at'] = now();
+            $this->connection()->table('cauce_circuit_breakers')
+                ->insert($data);
+        }
     }
 
-    protected function cache(): Cache
+    protected function connection(): ConnectionInterface
     {
-        return $this->cache ?? app('cache.store');
+        if ($this->connection !== null) {
+            return $this->connection;
+        }
+
+        $name = config('cauce.storage.database.connection');
+
+        /** @var \Illuminate\Database\ConnectionResolverInterface $resolver */
+        $resolver = app('db');
+
+        return $this->connection = $resolver->connection($name);
     }
 }

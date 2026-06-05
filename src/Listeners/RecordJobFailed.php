@@ -22,22 +22,18 @@ class RecordJobFailed
     public function handle(JobFailed $event): void
     {
         try {
-            $cauceId = $this->resolveCauceId($event);
-
             $exceptionData = $this->extractor->fromFailed($event);
 
-            if ($cauceId !== null) {
-                $this->jobs->markFailed($cauceId, $exceptionData['exception']);
+            $row = $this->resolveRow($event);
 
-                $row = $this->jobs->find($cauceId);
+            if ($row !== null) {
+                $this->jobs->markFailed($row->id, $exceptionData['exception']);
 
-                if ($row !== null) {
-                    $this->metrics->increment(
-                        connection: $row->connection,
-                        queue: $row->queue,
-                        metric: 'failed',
-                    );
-                }
+                $this->metrics->increment(
+                    connection: $row->connection,
+                    queue: $row->queue,
+                    metric: 'failed',
+                );
 
                 return;
             }
@@ -53,7 +49,6 @@ class RecordJobFailed
                 'attempts' => (int) $event->job->attempts(),
                 'exception' => $exceptionData['exception'],
                 'failed_at' => now(),
-                'queued_at' => now(),
             ]);
         } catch (\Throwable $e) {
             Log::warning('Cauce: failed to record failed job', [
@@ -63,7 +58,7 @@ class RecordJobFailed
         }
     }
 
-    protected function resolveCauceId(JobFailed $event): ?string
+    protected function resolveRow(JobFailed $event): ?object
     {
         $uuid = $event->job->payload()['uuid'] ?? $event->job->getJobId();
 
@@ -71,6 +66,6 @@ class RecordJobFailed
             return null;
         }
 
-        return $this->jobs->findIdByUuid((string) $uuid);
+        return $this->jobs->findRowByUuid((string) $uuid);
     }
 }

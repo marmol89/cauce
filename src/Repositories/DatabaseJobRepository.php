@@ -146,6 +146,20 @@ class DatabaseJobRepository implements JobRepository
         return $id !== null ? (string) $id : null;
     }
 
+    public function findRowByUuid(string $uuid): ?object
+    {
+        $row = $this->connection->table($this->table)
+            ->where('uuid', $uuid)
+            ->orderByDesc('id')
+            ->first();
+
+        if ($row === null) {
+            return null;
+        }
+
+        return $this->decodeJsonColumns($row);
+    }
+
     public function paginate(array $filters = [], int $perPage = 25): LengthAwarePaginator
     {
         $query = $this->connection->table($this->table)->orderByDesc('id');
@@ -175,7 +189,7 @@ class DatabaseJobRepository implements JobRepository
         return $paginator;
     }
 
-    public function retry(string $cauceId): bool
+    public function retry(string $cauceId, ?string $connection = null, ?string $queue = null): bool
     {
         $row = $this->find($cauceId);
 
@@ -183,7 +197,7 @@ class DatabaseJobRepository implements JobRepository
             return false;
         }
 
-        if (! $this->dispatchFromPayload($row)) {
+        if (! $this->dispatchFromPayload($row, $connection, $queue)) {
             return false;
         }
 
@@ -283,6 +297,46 @@ class DatabaseJobRepository implements JobRepository
             });
     }
 
+    public function distinctConnections(): Collection
+    {
+        return $this->connection->table($this->table)
+            ->select('connection')
+            ->distinct()
+            ->orderBy('connection')
+            ->pluck('connection');
+    }
+
+    public function distinctQueues(): Collection
+    {
+        return $this->connection->table($this->table)
+            ->select('queue')
+            ->distinct()
+            ->orderBy('queue')
+            ->pluck('queue');
+    }
+
+    public function distinctTags(): Collection
+    {
+        $rows = $this->connection->table($this->table)
+            ->whereNotNull('tags')
+            ->select('tags')
+            ->distinct()
+            ->limit(1000)
+            ->get();
+
+        $tags = [];
+        foreach ($rows as $row) {
+            $decoded = json_decode($row->tags, true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $tag) {
+                    $tags[$tag] = true;
+                }
+            }
+        }
+
+        return collect(array_keys($tags))->sort()->values();
+    }
+
     protected function applyFilters($query, array $filters): void
     {
         if (! empty($filters['connection'])) {
@@ -301,12 +355,27 @@ class DatabaseJobRepository implements JobRepository
             $query->where('name', 'like', '%' . $filters['name'] . '%');
         }
 
+        if (! empty($filters['batch_id'])) {
+            $query->where('batch_id', $filters['batch_id']);
+        }
+
+        if (! empty($filters['chain_id'])) {
+            $query->where('chain_id', $filters['chain_id']);
+        }
+
         if (! empty($filters['from'])) {
             $query->where('created_at', '>=', $filters['from']);
         }
 
         if (! empty($filters['to'])) {
             $query->where('created_at', '<=', $filters['to']);
+        }
+
+        if (! empty($filters['tags'])) {
+            $tags = (array) $filters['tags'];
+            foreach ($tags as $tag) {
+                $query->where('tags', 'like', '%"' . $tag . '"%');
+            }
         }
     }
 

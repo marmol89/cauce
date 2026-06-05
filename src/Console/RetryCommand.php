@@ -43,7 +43,7 @@ class RetryCommand extends Command
             return self::FAILURE;
         }
 
-        if (! $jobs->retry($row->id)) {
+        if (! $jobs->retry($row->id, $this->option('connection'), $this->option('queue'))) {
             $this->components->error('Could not reconstruct the job from the stored payload.');
 
             return self::FAILURE;

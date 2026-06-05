@@ -21,6 +21,16 @@ class MetricsChart extends Component
     #[Url]
     public int $hours = 6;
 
+    public function mount(): void
+    {
+        $this->hours = max(1, min(168, $this->hours));
+    }
+
+    public function updatedHours(): void
+    {
+        $this->hours = max(1, min(168, $this->hours));
+    }
+
     public function render()
     {
         return view('cauce::livewire.metrics-chart');

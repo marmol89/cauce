@@ -31,6 +31,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Production access
+    |--------------------------------------------------------------------------
+    |
+    | By default, the dashboard is only accessible in local, testing, staging,
+    | or development environments. Set this to true to allow dashboard access
+    | in production (you should also add authentication middleware).
+    |
+    */
+
+    'allow_production' => env('CAUCE_ALLOW_PRODUCTION', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Middleware
     |--------------------------------------------------------------------------
     |
@@ -43,6 +56,7 @@ return [
     'middleware' => [
         'web',
         \Marmol89\Cauce\Http\Middleware\Authorize::class,
+        'throttle:60,1',
     ],
 
     /*
@@ -80,6 +94,7 @@ return [
         'sample_rate' => env('CAUCE_SAMPLE_RATE', 1.0),
         'store_payload' => env('CAUCE_STORE_PAYLOAD', true),
         'payload_max_size' => env('CAUCE_PAYLOAD_MAX_SIZE', 65535),
+        'redacted_fields' => ['password', 'token', 'secret', 'key', 'authorization', 'credential'],
     ],
 
     /*
@@ -126,7 +141,28 @@ return [
 
     'dashboard' => [
         'refresh_seconds' => env('CAUCE_DASHBOARD_REFRESH', 5),
+        'refresh_hours' => env('CAUCE_DASHBOARD_REFRESH_HOURS', 24),
         'rows_per_page' => env('CAUCE_DASHBOARD_ROWS', 25),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Alerts
+    |--------------------------------------------------------------------------
+    |
+    | Configure alerting when Cauce detects anomalies such as a spike in
+    | failed jobs or a circuit breaker opening. Channels may be "log",
+    | "mail", or "slack". The circuit-breaker alert can be toggled
+    | independently.
+    |
+    */
+
+    'alerts' => [
+        'enabled' => env('CAUCE_ALERTS_ENABLED', false),
+        'failed_job_threshold' => env('CAUCE_FAILED_THRESHOLD', 10),
+        'failed_job_window_minutes' => env('CAUCE_FAILED_WINDOW', 5),
+        'circuit_breaker_open' => env('CAUCE_ALERT_CIRCUIT_BREAKER', true),
+        'channels' => ['log'],
     ],
 
 ];

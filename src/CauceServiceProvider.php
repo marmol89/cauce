@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Marmol89\Cauce\Console\AlertCommand;
 use Marmol89\Cauce\Console\ClearCommand;
 use Marmol89\Cauce\Console\InstallCommand;
 use Marmol89\Cauce\Console\PruneCommand;
@@ -36,6 +37,8 @@ use Marmol89\Cauce\Listeners\RecordJobQueued;
 use Marmol89\Cauce\Repositories\DatabaseJobRepository;
 use Marmol89\Cauce\Repositories\DatabaseMetricsRepository;
 use Marmol89\Cauce\Retry\RetryManager;
+use Marmol89\Cauce\Support\AlertManager;
+use Marmol89\Cauce\Support\ConfigValidator;
 use Marmol89\Cauce\Support\JobPayloadExtractor;
 
 class CauceServiceProvider extends ServiceProvider
@@ -53,7 +56,11 @@ class CauceServiceProvider extends ServiceProvider
 
         $this->app->alias(Cauce::class, 'cauce');
 
+        $this->app->singleton(ConfigValidator::class);
+
         $this->app->singleton(JobPayloadExtractor::class);
+
+        $this->app->singleton(AlertManager::class);
 
         $this->app->singleton(RetryManager::class, function (Application $app): RetryManager {
             return new RetryManager($app);
@@ -76,6 +83,7 @@ class CauceServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->bootConfigValidation();
         $this->bootPublishing();
         $this->bootRoutes();
         $this->bootViews();
@@ -90,6 +98,16 @@ class CauceServiceProvider extends ServiceProvider
             Cauce::class,
             'cauce',
         ];
+    }
+
+    protected function bootConfigValidation(): void
+    {
+        if ($this->app->runningInConsole() && $this->app->isProduction()) {
+            return;
+        }
+
+        $validator = $this->app->make(ConfigValidator::class);
+        $validator->validate();
     }
 
     protected function bootPublishing(): void
@@ -124,6 +142,8 @@ class CauceServiceProvider extends ServiceProvider
         ], function (): void {
             $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
         });
+
+        $this->loadRoutesFrom(__DIR__ . '/../routes/api.php');
     }
 
     protected function bootViews(): void
@@ -155,6 +175,7 @@ class CauceServiceProvider extends ServiceProvider
         }
 
         $this->commands([
+            AlertCommand::class,
             InstallCommand::class,
             PruneCommand::class,
             RetryCommand::class,

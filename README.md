@@ -42,6 +42,69 @@ php artisan vendor:publish --tag=cauce-config
 
 The dashboard is available at `/cauce` by default. You can change the path, restrict it to specific environments, and configure retention in `config/cauce.php`.
 
+### Dashboard access control
+
+By default, the dashboard is only accessible in `local`, `testing`, `staging`, and `development` environments. To allow access in production, set the config or env variable:
+
+```bash
+# .env
+CAUCE_ALLOW_PRODUCTION=true
+CAUCE_PATH=cauce
+```
+
+To add authentication, extend the middleware array in `config/cauce.php`:
+
+```php
+'middleware' => [
+    'web',
+    \Marmol89\Cauce\Http\Middleware\Authorize::class,
+    'auth',              // Require authentication
+    'throttle:60,1',     // Rate limit: 60 requests per minute
+],
+```
+
+You can also customize the Gate in your `AppServiceProvider`:
+
+```php
+use Illuminate\Support\Facades\Gate;
+
+Gate::define('viewCauce', function ($user = null) {
+    return $user !== null && $user->hasRole('admin');
+});
+```
+
+### Circuit breaker
+
+The `CircuitBreaker` strategy prevents repeated calls to failing external services. Configure it per-job:
+
+```php
+#[Retry(
+    strategy: CircuitBreaker::class,
+    threshold: 5,     // Failures before opening (default: 5)
+    cooldown: 60,     // Seconds before trying again (default: 60)
+    key: 'payment-api' // Unique key per service
+)]
+class ProcessPayment implements ShouldQueue
+{
+    // ...
+}
+```
+
+The breaker transitions through three states:
+- **Closed** — normal operation, requests pass through
+- **Open** — failures exceeded threshold, all requests blocked
+- **Half-open** — cooldown expired, allow one request to test the service
+
+### Payload redaction
+
+Cauce automatically redacts sensitive fields (passwords, tokens, secrets) from stored job payloads. Customize the field list in `config/cauce.php`:
+
+```php
+'monitoring' => [
+    'redacted_fields' => ['password', 'token', 'secret', 'key', 'authorization'],
+],
+```
+
 ## Quick start
 
 ### Tracking jobs
@@ -92,9 +155,60 @@ public function middleware(): array
 |---|---|
 | `php artisan cauce:install` | Publish assets and run migrations |
 | `php artisan cauce:status` | CLI overview of queue status |
-| `php artisan cauce:retry {id}` | Retry a failed job |
-| `php artisan cauce:prune` | Clean up old records |
-| `php artisan cauce:clear` | Wipe stored data |
+| `php artisan cauce:retry {id}` | Retry a failed job. Use `--queue=` and `--connection=` to re-queue on a different queue/connection. |
+| `php artisan cauce:prune` | Clean up old records based on retention config |
+| `php artisan cauce:clear` | Wipe stored data. Use `--jobs`, `--metrics`, `--breakers`, or `--all`. |
+
+### Scheduling prune
+
+Add to `routes/console.php` or your scheduler:
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('cauce:prune')->daily();
+```
+
+### Clearing specific data
+
+```bash
+# Clear only job records
+php artisan cauce:clear --jobs --force
+
+# Clear only metrics
+php artisan cauce:clear --metrics --force
+
+# Clear circuit breaker state
+php artisan cauce:clear --breakers --force
+
+# Clear everything
+php artisan cauce:clear --all --force
+```
+
+## Troubleshooting
+
+**Dashboard returns 403 in production**
+Set `CAUCE_ALLOW_PRODUCTION=true` in your `.env` file, or customize the `viewCauce` Gate.
+
+**Jobs are not appearing in the dashboard**
+Verify `CAUCE_ENABLED` is not set to `false`. Cauce auto-discovers package migrations, but if you're having issues run `php artisan vendor:publish --tag=cauce-migrations` then `php artisan migrate`.
+
+**Circuit breaker state not persisting**
+Circuit breaker state is stored in the `cauce_circuit_breakers` database table. Ensure migrations have been run and the configured database connection is accessible.
+
+**Dashboard performance with many jobs**
+Configure retention settings to keep the jobs table lean:
+```php
+'retention' => [
+    'completed_hours' => 24,   // Keep completed jobs for 24h
+    'failed_days' => 7,        // Keep failed jobs for 7 days
+    'metrics_days' => 30,      // Keep metrics for 30 days
+],
+```
+Then schedule `cauce:prune` to run daily.
+
+**Sensitive data in payloads**
+Cauce redacts common sensitive field names by default. To add more, configure `redacted_fields` in `config/cauce.php`. To disable payload storage entirely, set `CAUCE_STORE_PAYLOAD=false`.
 
 ## Why Cauce?
 
