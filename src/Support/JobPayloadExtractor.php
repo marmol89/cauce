@@ -22,13 +22,14 @@ class JobPayloadExtractor
     public function fromQueued(JobQueued $event): array
     {
         $maxSize = (int) config('cauce.monitoring.payload_max_size', 65535);
+        $payload = $event->payload();
 
         return [
-            'uuid' => $event->id,
+            'uuid' => $payload['uuid'] ?? ($event->id !== null ? (string) $event->id : $this->ulid()),
             'connection' => $event->connectionName,
-            'queue' => $event->job->getQueue() ?: 'default',
-            'name' => $this->resolveJobName($event->job),
-            'payload' => $this->safePayload($event->job->payload(), $maxSize),
+            'queue' => $event->queue ?: 'default',
+            'name' => $payload['displayName'] ?? $this->resolveJobName($event->job),
+            'payload' => $this->safePayload($payload, $maxSize),
             'tags' => $this->resolveTags($event->job),
             'queued_at' => now(),
             'status' => 'queued',

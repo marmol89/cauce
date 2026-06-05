@@ -6,11 +6,11 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Cauce')</title>
     @livewireStyles
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/[email protected]/dist/tailwind.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
     <script defer src="https://cdn.jsdelivr.net/npm/[email protected]/dist/cdn.min.js"></script>
     @stack('head')
-    <style>
+    <style type="text/tailwindcss">
         .cauce-nav-link { @apply px-3 py-2 rounded text-sm font-medium text-slate-600 hover:bg-slate-100; }
         .cauce-nav-link.active { @apply bg-slate-900 text-white hover:bg-slate-800; }
         .cauce-card { @apply bg-white rounded-lg shadow p-5; }

@@ -26,7 +26,7 @@ class PruneCommand extends Command
         $metricsDays = (int) ($this->option('metrics') ?? config('cauce.retention.metrics_days', 30));
 
         $this->components->info("Pruning records older than:");
-        $this->components->twoLineDetail(
+        $this->components->twoColumnDetail(
             "<fg=cyan>Completed:</>  $completedHours hours",
             "<fg=cyan>Failed:</>     $failedDays days / <fg=cyan>Metrics:</>  $metricsDays days",
         );
@@ -46,11 +46,11 @@ class PruneCommand extends Command
         $metricsCount = $metrics->prune($metricsBefore);
 
         $this->newLine();
-        $this->components->twoLineDetail(
+        $this->components->twoColumnDetail(
             "<fg=green>Pruned completed:</>  $completed rows",
             "<fg=green>Pruned failed:</>     $failed rows",
         );
-        $this->components->twoLineDetail(
+        $this->components->twoColumnDetail(
             "<fg=green>Pruned metrics:</>    $metricsCount rows",
             '',
         );

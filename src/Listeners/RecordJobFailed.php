@@ -45,10 +45,10 @@ class RecordJobFailed
             // No cauce id — fall back to creating a fresh row so the failure is
             // still tracked.
             $this->jobs->recordQueued([
-                'uuid' => $event->job->uuid() ?? null,
+                'uuid' => method_exists($event->job, 'uuid') ? $event->job->uuid() : ($event->job->getJobId() ?: null),
                 'connection' => $event->connectionName,
                 'queue' => $event->job->getQueue() ?: 'default',
-                'name' => $event->job->resolveName() ?? get_class($event->job),
+                'name' => method_exists($event->job, 'resolveName') ? $event->job->resolveName() : get_class($event->job),
                 'status' => 'failed',
                 'attempts' => (int) $event->job->attempts(),
                 'exception' => $exceptionData['exception'],
@@ -65,8 +65,12 @@ class RecordJobFailed
 
     protected function resolveCauceId(JobFailed $event): ?string
     {
-        $payload = method_exists($event->job, 'getPayload') ? $event->job->getPayload() : [];
+        $uuid = $event->job->payload()['uuid'] ?? $event->job->getJobId();
 
-        return $payload['cauce_id'] ?? null;
+        if ($uuid === null || $uuid === '') {
+            return null;
+        }
+
+        return $this->jobs->findIdByUuid((string) $uuid);
     }
 }

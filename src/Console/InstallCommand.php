@@ -35,7 +35,7 @@ class InstallCommand extends Command
 
         if ($files->exists($configPath) && ! $this->option('force')) {
             $this->components->warn("Config file already exists at [$configPath].");
-            $this->components->twoLineDetail(
+            $this->components->twoColumnDetail(
                 'Use --force to overwrite.',
                 'Or run: php artisan vendor:publish --tag=cauce-config',
             );
@@ -102,7 +102,7 @@ class InstallCommand extends Command
         $this->components->info('Cauce installed successfully.');
         $this->newLine();
 
-        $this->components->twoLineDetail(
+        $this->components->twoColumnDetail(
             '<fg=cyan>Dashboard URL</>  /'.config('cauce.path', 'cauce'),
             '<fg=cyan>Documentation</>   https://github.com/marmol89/cauce',
         );

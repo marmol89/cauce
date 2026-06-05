@@ -23,7 +23,7 @@ class RecordJobQueued
     public function handle(JobQueued $event): void
     {
         try {
-            if (! $this->shouldTrack($event->connectionName, $event->job->getQueue() ?: 'default')) {
+            if (! $this->shouldTrack($event->connectionName, $event->queue ?: 'default')) {
                 return;
             }
 
@@ -32,13 +32,7 @@ class RecordJobQueued
             }
 
             $data = $this->extractor->fromQueued($event);
-            $cauceId = $this->jobs->recordQueued($data);
-
-            // Stash cauce id on the job so later listeners can update the same row.
-            if (method_exists($event->job, 'getPayload')) {
-                $payload = $event->job->getPayload();
-                $payload['cauce_id'] = $cauceId;
-            }
+            $this->jobs->recordQueued($data);
         } catch (\Throwable $e) {
             Log::warning('Cauce: failed to record queued job', [
                 'connection' => $event->connectionName ?? null,

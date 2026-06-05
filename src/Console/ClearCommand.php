@@ -43,17 +43,17 @@ class ClearCommand extends Command
 
         if ($clearJobs) {
             $count = $connection->table('cauce_jobs')->delete();
-            $this->components->twoLineDetail('<fg=green>Cleared cauce_jobs:</>', "  $count rows");
+            $this->components->twoColumnDetail('<fg=green>Cleared cauce_jobs:</>', "  $count rows");
         }
 
         if ($clearMetrics) {
             $count = $connection->table('cauce_metrics')->delete();
-            $this->components->twoLineDetail('<fg=green>Cleared cauce_metrics:</>', "  $count rows");
+            $this->components->twoColumnDetail('<fg=green>Cleared cauce_metrics:</>', "  $count rows");
         }
 
         if ($clearBreakers) {
             $count = $connection->table('cauce_circuit_breakers')->delete();
-            $this->components->twoLineDetail('<fg=green>Cleared cauce_circuit_breakers:</>', "  $count rows");
+            $this->components->twoColumnDetail('<fg=green>Cleared cauce_circuit_breakers:</>', "  $count rows");
         }
 
         $this->components->info('Clear complete.');

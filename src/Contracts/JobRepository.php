@@ -22,6 +22,8 @@ interface JobRepository
 
     public function find(string $cauceId): ?object;
 
+    public function findIdByUuid(string $uuid): ?string;
+
     public function paginate(array $filters = [], int $perPage = 25): LengthAwarePaginator;
 
     public function failed(int $perPage = 25): LengthAwarePaginator;

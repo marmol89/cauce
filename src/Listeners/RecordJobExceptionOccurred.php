@@ -20,6 +20,10 @@ class RecordJobExceptionOccurred
     public function handle(JobExceptionOccurred $event): void
     {
         try {
+            if (method_exists($event->job, 'hasFailed') && $event->job->hasFailed()) {
+                return;
+            }
+
             $cauceId = $this->resolveCauceId($event);
 
             if ($cauceId === null) {
@@ -39,8 +43,12 @@ class RecordJobExceptionOccurred
 
     protected function resolveCauceId(JobExceptionOccurred $event): ?string
     {
-        $payload = method_exists($event->job, 'getPayload') ? $event->job->getPayload() : [];
+        $uuid = $event->job->payload()['uuid'] ?? $event->job->getJobId();
 
-        return $payload['cauce_id'] ?? null;
+        if ($uuid === null || $uuid === '') {
+            return null;
+        }
+
+        return $this->jobs->findIdByUuid((string) $uuid);
     }
 }

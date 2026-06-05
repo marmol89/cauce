@@ -15,7 +15,9 @@
                 @forelse($this->jobs as $job)
                     <tr wire:key="failed-{{ $job->id }}">
                         <td class="px-3 py-2 font-mono text-xs text-slate-700">
-                            {{ \Illuminate\Support\Str::limit($job->name, 40) }}
+                            <a href="{{ route('cauce.jobs.show', $job->id) }}" class="hover:text-indigo-600">
+                                {{ \Illuminate\Support\Str::limit($job->name, 40) }}
+                            </a>
                         </td>
                         <td class="px-3 py-2 text-slate-600">{{ $job->connection }}</td>
                         <td class="px-3 py-2 text-slate-600">{{ $job->queue }}</td>

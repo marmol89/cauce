@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Marmol89\Cauce\Console;
 
 use Illuminate\Console\Command;
-use Illuminate\Contracts\Queue\Job;
-use Illuminate\Support\Facades\Queue;
 use Marmol89\Cauce\Contracts\JobRepository;
 
 class RetryCommand extends Command
@@ -28,7 +26,7 @@ class RetryCommand extends Command
             return self::FAILURE;
         }
 
-        $this->components->info("Re-queueing job:");
+        $this->components->info('Re-queueing job:');
         $this->table(
             ['Field', 'Value'],
             [
@@ -45,39 +43,14 @@ class RetryCommand extends Command
             return self::FAILURE;
         }
 
-        if (! $this->dispatchFromPayload($row)) {
+        if (! $jobs->retry($row->id)) {
             $this->components->error('Could not reconstruct the job from the stored payload.');
 
             return self::FAILURE;
         }
 
-        $jobs->retry($row->id);
-
         $this->components->info('Job re-queued. Cauce record reset.');
 
         return self::SUCCESS;
-    }
-
-    protected function dispatchFromPayload(object $row): bool
-    {
-        $payload = is_string($row->payload) ? json_decode($row->payload, true) : (array) $row->payload;
-
-        if (! is_array($payload) || empty($payload['data']['commandName'])) {
-            return false;
-        }
-
-        $command = $payload['data']['commandName'];
-        $arguments = $payload['data']['command'] ?? null;
-
-        if (! class_exists($command)) {
-            return false;
-        }
-
-        $connection = $this->option('connection') ?: $row->connection;
-        $queue = $this->option('queue') ?: $row->queue;
-
-        Queue::connection($connection)->push($arguments, '', $queue);
-
-        return true;
     }
 }

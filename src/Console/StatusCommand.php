@@ -30,7 +30,7 @@ class StatusCommand extends Command
         $this->components->info("Cauce — last $hours hours");
         $this->newLine();
 
-        $this->components->twoLineDetail(
+        $this->components->twoColumnDetail(
             "<fg=cyan>Connection:</>  $connection",
             "<fg=cyan>Queue:</>       $queue",
         );

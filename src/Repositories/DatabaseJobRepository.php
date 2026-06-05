@@ -9,6 +9,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Queue;
 use Marmol89\Cauce\Contracts\JobRepository;
 
 class DatabaseJobRepository implements JobRepository
@@ -57,6 +58,17 @@ class DatabaseJobRepository implements JobRepository
             if (isset($row->$field) && is_string($row->$field)) {
                 $decoded = json_decode($row->$field, true);
                 $row->$field = is_array($decoded) ? $decoded : null;
+            }
+        }
+
+        return $this->castDates($row);
+    }
+
+    protected function castDates(object $row): object
+    {
+        foreach (['created_at', 'updated_at', 'started_at', 'finished_at', 'failed_at', 'available_at'] as $field) {
+            if (isset($row->$field) && is_string($row->$field)) {
+                $row->$field = CarbonImmutable::parse($row->$field);
             }
         }
 
@@ -124,6 +136,16 @@ class DatabaseJobRepository implements JobRepository
         return $this->decodeJsonColumns($row);
     }
 
+    public function findIdByUuid(string $uuid): ?string
+    {
+        $id = $this->connection->table($this->table)
+            ->where('uuid', $uuid)
+            ->orderByDesc('id')
+            ->value('id');
+
+        return $id !== null ? (string) $id : null;
+    }
+
     public function paginate(array $filters = [], int $perPage = 25): LengthAwarePaginator
     {
         $query = $this->connection->table($this->table)->orderByDesc('id');
@@ -161,6 +183,10 @@ class DatabaseJobRepository implements JobRepository
             return false;
         }
 
+        if (! $this->dispatchFromPayload($row)) {
+            return false;
+        }
+
         $this->connection->table($this->table)
             ->where('id', $cauceId)
             ->update([
@@ -172,6 +198,31 @@ class DatabaseJobRepository implements JobRepository
                 'attempts' => 0,
                 'updated_at' => now(),
             ]);
+
+        return true;
+    }
+
+    protected function dispatchFromPayload(object $row, ?string $connection = null, ?string $queue = null): bool
+    {
+        $payload = $row->payload;
+
+        if (is_string($payload)) {
+            $payload = json_decode($payload, true);
+        }
+
+        if (! is_array($payload) || empty($payload['data']['commandName'])) {
+            return false;
+        }
+
+        if (! class_exists($payload['data']['commandName'])) {
+            return false;
+        }
+
+        $payload['attempts'] = 0;
+        $payload['uuid'] = (string) (\Symfony\Component\Uid\Uuid::v4());
+
+        Queue::connection($connection ?: $row->connection)
+            ->pushRaw(json_encode($payload, JSON_UNESCAPED_UNICODE), $queue ?: $row->queue);
 
         return true;
     }
