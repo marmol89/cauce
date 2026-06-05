@@ -16,4 +16,6 @@ interface MetricsRepository
     public function totals(string $connection, string $queue, CarbonImmutable $from, CarbonImmutable $to): array;
 
     public function prune(CarbonImmutable $before): int;
+
+    public function globalTotals(CarbonImmutable $from, CarbonImmutable $to): array;
 }

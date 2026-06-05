@@ -98,8 +98,20 @@ class JobPayloadExtractor
 
         $encoded = json_encode($payload, JSON_UNESCAPED_UNICODE);
 
-        if ($encoded === false || strlen($encoded) > $maxSize) {
+        if ($encoded === false) {
             return null;
+        }
+
+        if (strlen($encoded) > $maxSize) {
+            if (isset($payload['data']['command']) && is_array($payload['data'])) {
+                unset($payload['data']['command']);
+            }
+
+            $encoded = json_encode($payload, JSON_UNESCAPED_UNICODE);
+
+            if ($encoded === false || strlen($encoded) > $maxSize) {
+                return null;
+            }
         }
 
         return $payload;

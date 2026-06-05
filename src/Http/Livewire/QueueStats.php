@@ -12,6 +12,13 @@ class QueueStats extends Component
 {
     public int $hours;
 
+    protected JobRepository $jobRepository;
+
+    public function boot(JobRepository $jobs): void
+    {
+        $this->jobRepository = $jobs;
+    }
+
     public function mount(): void
     {
         $this->hours = (int) config('cauce.dashboard.refresh_hours', 24);
@@ -26,12 +33,12 @@ class QueueStats extends Component
     #[Computed]
     public function byConnection()
     {
-        return app(JobRepository::class)->countsByConnection($this->hours);
+        return $this->jobRepository->countsByConnection($this->hours);
     }
 
     #[Computed]
     public function byQueue()
     {
-        return app(JobRepository::class)->countsByQueue($this->hours);
+        return $this->jobRepository->countsByQueue($this->hours);
     }
 }

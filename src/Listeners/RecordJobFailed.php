@@ -8,6 +8,7 @@ use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Facades\Log;
 use Marmol89\Cauce\Contracts\JobRepository;
 use Marmol89\Cauce\Contracts\MetricsRepository;
+use Marmol89\Cauce\Support\DeadLetterManager;
 use Marmol89\Cauce\Support\JobPayloadExtractor;
 
 class RecordJobFailed
@@ -34,6 +35,14 @@ class RecordJobFailed
                     queue: $row->queue,
                     metric: 'failed',
                 );
+
+                if (DeadLetterManager::shouldSend()) {
+                    try {
+                        DeadLetterManager::send($row);
+                    } catch (\Throwable) {
+                        // DLQ delivery is best-effort; don't crash the listener.
+                    }
+                }
 
                 return;
             }

@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+    .cauce-nav-link { @apply px-3 py-2 rounded text-sm font-medium text-slate-600 hover:bg-slate-100; }
+    .cauce-nav-link.active { @apply bg-slate-900 text-white hover:bg-slate-800; }
+    .cauce-card { @apply bg-white rounded-lg shadow p-5; }
+    .cauce-badge { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium; }
+}

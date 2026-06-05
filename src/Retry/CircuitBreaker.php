@@ -6,6 +6,9 @@ namespace Marmol89\Cauce\Retry;
 
 use Illuminate\Database\ConnectionInterface;
 use Marmol89\Cauce\Contracts\RetryStrategy;
+use Marmol89\Cauce\Events\CircuitBreakerClosed;
+use Marmol89\Cauce\Events\CircuitBreakerHalfOpened;
+use Marmol89\Cauce\Events\CircuitBreakerOpened;
 use Marmol89\Cauce\Support\AlertManager;
 
 class CircuitBreaker implements RetryStrategy
@@ -56,6 +59,7 @@ class CircuitBreaker implements RetryStrategy
         if ($row->state === self::STATE_OPEN) {
             $openedAt = strtotime((string) $row->opened_at);
             if ($openedAt !== false && (time() - $openedAt) >= $this->cooldown) {
+                CircuitBreakerHalfOpened::dispatch($this->key());
                 $this->transitionTo(self::STATE_HALF_OPEN);
 
                 return self::STATE_HALF_OPEN;
@@ -75,7 +79,14 @@ class CircuitBreaker implements RetryStrategy
         $row = $this->getRow();
 
         if ($row !== null && $row->state === self::STATE_HALF_OPEN) {
+            CircuitBreakerClosed::dispatch($this->key());
+
+            if (app()->bound(AlertManager::class)) {
+                app(AlertManager::class)->notifyCircuitBreakerClosed($this->key());
+            }
+
             $this->transitionTo(self::STATE_CLOSED);
+            return;
         }
 
         $this->upsertRow([
@@ -110,6 +121,8 @@ class CircuitBreaker implements RetryStrategy
         $this->upsertRow($data);
 
         if ($data['state'] === self::STATE_OPEN && $data['failures'] === $this->threshold) {
+            CircuitBreakerOpened::dispatch($this->key(), $this->threshold);
+
             if (app()->bound(AlertManager::class)) {
                 app(AlertManager::class)->notifyCircuitBreakerOpen($this->key());
             }
@@ -121,6 +134,20 @@ class CircuitBreaker implements RetryStrategy
         $this->connection()->table('cauce_circuit_breakers')
             ->where('key', $this->key())
             ->delete();
+    }
+
+    public static function openKeys(): array
+    {
+        $name = config('cauce.storage.database.connection');
+
+        /** @var \Illuminate\Database\ConnectionResolverInterface $resolver */
+        $resolver = app('db');
+        $connection = $resolver->connection($name);
+
+        return $connection->table('cauce_circuit_breakers')
+            ->where('state', self::STATE_OPEN)
+            ->pluck('key')
+            ->toArray();
     }
 
     protected function transitionTo(string $state): void
@@ -155,24 +182,27 @@ class CircuitBreaker implements RetryStrategy
 
     protected function upsertRow(array $data): void
     {
-        $data['threshold'] = $this->threshold;
-        $data['cooldown'] = $this->cooldown;
-        $data['updated_at'] = now();
+        $values = [
+            'key' => $this->key(),
+            'state' => $data['state'],
+            'failures' => $data['failures'],
+            'threshold' => $this->threshold,
+            'cooldown' => $this->cooldown,
+            'opened_at' => $data['opened_at'] ?? null,
+            'half_open_at' => $data['half_open_at'] ?? null,
+            'closed_at' => $data['closed_at'] ?? null,
+            'updated_at' => now(),
+            'created_at' => now(),
+        ];
 
-        $exists = $this->connection()->table('cauce_circuit_breakers')
-            ->where('key', $this->key())
-            ->exists();
-
-        if ($exists) {
-            $this->connection()->table('cauce_circuit_breakers')
-                ->where('key', $this->key())
-                ->update($data);
-        } else {
-            $data['key'] = $this->key();
-            $data['created_at'] = now();
-            $this->connection()->table('cauce_circuit_breakers')
-                ->insert($data);
-        }
+        $this->connection()->table('cauce_circuit_breakers')->upsert(
+            $values,
+            ['key'],
+            [
+                'state', 'failures', 'threshold', 'cooldown',
+                'opened_at', 'half_open_at', 'closed_at', 'updated_at',
+            ],
+        );
     }
 
     protected function connection(): ConnectionInterface

@@ -89,11 +89,22 @@ class RetryManager
             return null;
         }
 
-        $args = [
-            'maxAttempts' => config('cauce.retry.global_max_attempts') ?? 5,
-            'base' => 1,
-            'cap' => 300,
-        ];
+        $globalMax = config('cauce.retry.global_max_attempts');
+
+        if (is_a($class, CircuitBreaker::class, true)) {
+            $args = [
+                'threshold' => (int) config('cauce.retry.default_threshold', 5),
+                'cooldown' => (int) config('cauce.retry.default_cooldown', 60),
+                'maxAttempts' => $globalMax ?? 5,
+                'key' => config('cauce.retry.default_breaker_key', 'default'),
+            ];
+        } else {
+            $args = [
+                'maxAttempts' => $globalMax ?? 5,
+                'base' => (int) config('cauce.retry.default_base', 1),
+                'cap' => (int) config('cauce.retry.default_cap', 300),
+            ];
+        }
 
         return $this->container->make($class, $args);
     }

@@ -16,6 +16,15 @@ class Dashboard extends Component
 {
     public int $hours = 24;
 
+    protected JobRepository $jobRepository;
+    protected MetricsRepository $metricsRepository;
+
+    public function boot(JobRepository $jobs, MetricsRepository $metrics): void
+    {
+        $this->jobRepository = $jobs;
+        $this->metricsRepository = $metrics;
+    }
+
     public function mount(): void
     {
         $this->hours = (int) config('cauce.dashboard.refresh_hours', 24);
@@ -35,10 +44,10 @@ class Dashboard extends Component
             $from = CarbonImmutable::now()->subHours($this->hours);
 
             return [
-                'by_status' => app(JobRepository::class)->countsByStatus($this->hours),
-                'by_connection' => app(JobRepository::class)->countsByConnection($this->hours),
-                'by_queue' => app(JobRepository::class)->countsByQueue($this->hours),
-                'totals' => app(MetricsRepository::class)->totals('*', '*', $from, CarbonImmutable::now()),
+                'by_status' => $this->jobRepository->countsByStatus($this->hours),
+                'by_connection' => $this->jobRepository->countsByConnection($this->hours),
+                'by_queue' => $this->jobRepository->countsByQueue($this->hours),
+                'totals' => $this->metricsRepository->totals('*', '*', $from, CarbonImmutable::now()),
             ];
         });
     }

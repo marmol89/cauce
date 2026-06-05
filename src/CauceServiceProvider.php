@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Marmol89\Cauce\Console\AlertCommand;
 use Marmol89\Cauce\Console\ClearCommand;
+use Marmol89\Cauce\Console\DlqReplayCommand;
 use Marmol89\Cauce\Console\InstallCommand;
 use Marmol89\Cauce\Console\PruneCommand;
 use Marmol89\Cauce\Console\RetryCommand;
@@ -102,11 +103,8 @@ class CauceServiceProvider extends ServiceProvider
 
     protected function bootConfigValidation(): void
     {
-        if ($this->app->runningInConsole() && $this->app->isProduction()) {
-            return;
-        }
-
         $validator = $this->app->make(ConfigValidator::class);
+
         $validator->validate();
     }
 
@@ -127,6 +125,14 @@ class CauceServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../resources/views' => $this->app->resourcePath('views/vendor/cauce'),
         ], 'cauce-views');
+
+        $this->publishes([
+            __DIR__ . '/../resources/css' => $this->app->publicPath('vendor/cauce'),
+        ], 'cauce-assets');
+
+        $this->publishes([
+            __DIR__ . '/../tailwind.config.js' => $this->app->basePath('tailwind.cauce.js'),
+        ], 'cauce-tailwind');
     }
 
     protected function bootRoutes(): void
@@ -176,11 +182,12 @@ class CauceServiceProvider extends ServiceProvider
 
         $this->commands([
             AlertCommand::class,
+            ClearCommand::class,
+            DlqReplayCommand::class,
             InstallCommand::class,
             PruneCommand::class,
             RetryCommand::class,
             StatusCommand::class,
-            ClearCommand::class,
         ]);
     }
 

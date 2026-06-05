@@ -127,6 +127,11 @@ return [
     'retry' => [
         'default_strategy' => env('CAUCE_DEFAULT_RETRY_STRATEGY', null),
         'global_max_attempts' => env('CAUCE_GLOBAL_MAX_ATTEMPTS', null),
+        'default_base' => env('CAUCE_DEFAULT_RETRY_BASE', 1),
+        'default_cap' => env('CAUCE_DEFAULT_RETRY_CAP', 300),
+        'default_threshold' => env('CAUCE_DEFAULT_CIRCUIT_THRESHOLD', 5),
+        'default_cooldown' => env('CAUCE_DEFAULT_CIRCUIT_COOLDOWN', 60),
+        'default_breaker_key' => env('CAUCE_DEFAULT_BREAKER_KEY', 'default'),
     ],
 
     /*
@@ -143,6 +148,7 @@ return [
         'refresh_seconds' => env('CAUCE_DASHBOARD_REFRESH', 5),
         'refresh_hours' => env('CAUCE_DASHBOARD_REFRESH_HOURS', 24),
         'rows_per_page' => env('CAUCE_DASHBOARD_ROWS', 25),
+        'css_source' => env('CAUCE_CSS_SOURCE', 'cdn'),
     ],
 
     /*
@@ -163,6 +169,25 @@ return [
         'failed_job_window_minutes' => env('CAUCE_FAILED_WINDOW', 5),
         'circuit_breaker_open' => env('CAUCE_ALERT_CIRCUIT_BREAKER', true),
         'channels' => ['log'],
+        'mail_to' => env('CAUCE_ALERT_MAIL'),
+        'slack_webhook' => env('CAUCE_ALERT_SLACK_WEBHOOK'),
+        'webhook_url' => env('CAUCE_ALERT_WEBHOOK'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dead-Letter Queue
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, jobs that exhaust all retry attempts are pushed to a
+    | dedicated dead-letter queue for manual inspection and replay.
+    |
+    */
+
+    'dead_letter' => [
+        'enabled' => env('CAUCE_DLQ_ENABLED', false),
+        'connection' => env('CAUCE_DLQ_CONNECTION', null),
+        'queue' => env('CAUCE_DLQ_QUEUE', 'dead-letter'),
     ],
 
 ];

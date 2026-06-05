@@ -6,7 +6,13 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Cauce')</title>
     @livewireStyles
-    <script src="https://cdn.tailwindcss.com"></script>
+    @if(config('cauce.dashboard.css_source') === 'local')
+        <link rel="stylesheet" href="{{ asset('vendor/cauce/cauce.css') }}">
+    @else
+        <script src="https://cdn.tailwindcss.com/3.4.17"
+            integrity="sha384-PUPxJ03u6KzPQ6n/lVNPz5zB0t3uZ0Lzmx4+lRvOUhO68Xp/jvlpe0ZQJ+W0ZK5"
+            crossorigin="anonymous"></script>
+    @endif
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"
         integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g"
         crossorigin="anonymous" defer></script>
@@ -14,12 +20,14 @@
         integrity="sha384-X9kJyAubVxnP0hcA+AMMs21U445qsnqhnUF8EBlEpP3a42Kh/JwWjlv2ZcvGfphb"
         crossorigin="anonymous"></script>
     @stack('head')
+    @if(config('cauce.dashboard.css_source') !== 'local')
     <style type="text/tailwindcss">
         .cauce-nav-link { @apply px-3 py-2 rounded text-sm font-medium text-slate-600 hover:bg-slate-100; }
         .cauce-nav-link.active { @apply bg-slate-900 text-white hover:bg-slate-800; }
         .cauce-card { @apply bg-white rounded-lg shadow p-5; }
         .cauce-badge { @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium; }
     </style>
+    @endif
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen">
     <nav class="bg-white border-b border-slate-200">

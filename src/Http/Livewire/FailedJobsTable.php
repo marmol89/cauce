@@ -15,6 +15,13 @@ class FailedJobsTable extends Component
 
     public int $perPage;
 
+    protected JobRepository $jobRepository;
+
+    public function boot(JobRepository $jobs): void
+    {
+        $this->jobRepository = $jobs;
+    }
+
     public function mount(): void
     {
         $this->perPage = (int) config('cauce.dashboard.rows_per_page', 25);
@@ -28,18 +35,18 @@ class FailedJobsTable extends Component
     #[Computed]
     public function jobs()
     {
-        return app(JobRepository::class)->failed($this->perPage);
+        return $this->jobRepository->failed($this->perPage);
     }
 
     public function retry(string $id): void
     {
-        app(JobRepository::class)->retry($id);
+        $this->jobRepository->retry($id);
         $this->dispatch('cauce:refresh');
     }
 
     public function delete(string $id): void
     {
-        app(JobRepository::class)->delete($id);
+        $this->jobRepository->delete($id);
         $this->dispatch('cauce:refresh');
     }
 }

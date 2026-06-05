@@ -15,7 +15,11 @@ class Cauce
 
     public function version(): string
     {
-        return '0.1.0';
+        if (class_exists(\Composer\InstalledVersions::class)) {
+            return (string) (\Composer\InstalledVersions::getVersion('marmol89/cauce') ?: '0.2.0');
+        }
+
+        return '0.2.0';
     }
 
     public function path(): string

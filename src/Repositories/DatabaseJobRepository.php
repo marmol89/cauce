@@ -9,8 +9,10 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Marmol89\Cauce\Contracts\JobRepository;
+use Marmol89\Cauce\Events\JobRetried;
 
 class DatabaseJobRepository implements JobRepository
 {
@@ -213,6 +215,8 @@ class DatabaseJobRepository implements JobRepository
                 'updated_at' => now(),
             ]);
 
+        JobRetried::dispatch($cauceId, $row->name, $row->connection, $row->queue);
+
         return true;
     }
 
@@ -252,8 +256,15 @@ class DatabaseJobRepository implements JobRepository
     {
         return $this->connection->table($this->table)
             ->whereIn('status', ['completed', 'queued', 'retrying'])
-            ->where('finished_at', '<', $before)
-            ->whereNotNull('finished_at')
+            ->where(function ($query) use ($before) {
+                $query->where(function ($q) use ($before) {
+                    $q->whereNotNull('finished_at')
+                      ->where('finished_at', '<', $before);
+                })->orWhere(function ($q) use ($before) {
+                    $q->whereNull('finished_at')
+                      ->where('created_at', '<', $before);
+                });
+            })
             ->delete();
     }
 
@@ -317,24 +328,26 @@ class DatabaseJobRepository implements JobRepository
 
     public function distinctTags(): Collection
     {
-        $rows = $this->connection->table($this->table)
-            ->whereNotNull('tags')
-            ->select('tags')
-            ->distinct()
-            ->limit(1000)
-            ->get();
+        return Cache::remember('cauce:distinct_tags', 300, function () {
+            $rows = $this->connection->table($this->table)
+                ->whereNotNull('tags')
+                ->select('tags')
+                ->distinct()
+                ->limit(1000)
+                ->get();
 
-        $tags = [];
-        foreach ($rows as $row) {
-            $decoded = json_decode($row->tags, true);
-            if (is_array($decoded)) {
-                foreach ($decoded as $tag) {
-                    $tags[$tag] = true;
+            $tags = [];
+            foreach ($rows as $row) {
+                $decoded = json_decode($row->tags, true);
+                if (is_array($decoded)) {
+                    foreach ($decoded as $tag) {
+                        $tags[$tag] = true;
+                    }
                 }
             }
-        }
 
-        return collect(array_keys($tags))->sort()->values();
+            return collect(array_keys($tags))->sort()->values();
+        });
     }
 
     protected function applyFilters($query, array $filters): void

@@ -18,7 +18,17 @@ class Authorize
 
     public function handle(Request $request, Closure $next): Response
     {
-        $gate = $this->gate->forUser($request->user());
+        $user = $request->user();
+
+        if ($user === null) {
+            try {
+                $user = $request->user('api');
+            } catch (\InvalidArgumentException) {
+                $user = null;
+            }
+        }
+
+        $gate = $this->gate->forUser($user);
 
         if (! $gate->check('viewCauce', [$request])) {
             abort(403);

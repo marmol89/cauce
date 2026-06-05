@@ -24,7 +24,9 @@ class DashboardTest extends TestCase
 
     public function test_facade_version(): void
     {
-        $this->assertSame('0.1.0', Cauce::version());
+        $version = Cauce::version();
+        $this->assertIsString($version);
+        $this->assertNotEmpty($version);
     }
 
     public function test_facade_path(): void

@@ -31,6 +31,13 @@ class JobsTable extends Component
 
     public int $perPage;
 
+    protected JobRepository $jobRepository;
+
+    public function boot(JobRepository $jobs): void
+    {
+        $this->jobRepository = $jobs;
+    }
+
     public function mount(): void
     {
         $this->perPage = max(5, min(100, (int) config('cauce.dashboard.rows_per_page', 25)));
@@ -44,7 +51,7 @@ class JobsTable extends Component
     #[Computed]
     public function jobs()
     {
-        return app(JobRepository::class)->paginate(
+        return $this->jobRepository->paginate(
             array_filter([
                 'name' => $this->search,
                 'connection' => $this->connection,
@@ -59,19 +66,19 @@ class JobsTable extends Component
     #[Computed]
     public function connections()
     {
-        return app(JobRepository::class)->distinctConnections();
+        return $this->jobRepository->distinctConnections();
     }
 
     #[Computed]
     public function queues()
     {
-        return app(JobRepository::class)->distinctQueues();
+        return $this->jobRepository->distinctQueues();
     }
 
     #[Computed]
     public function availableTags()
     {
-        return app(JobRepository::class)->distinctTags();
+        return $this->jobRepository->distinctTags();
     }
 
     public function updatedSearch(): void

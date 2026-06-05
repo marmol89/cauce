@@ -8,16 +8,15 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Gate;
 use Marmol89\Cauce\Contracts\JobRepository;
 use Marmol89\Cauce\Contracts\MetricsRepository;
+use Marmol89\Cauce\Retry\CircuitBreaker;
 
 class ApiController extends Controller
 {
-	public function __construct()
-	{
-		Gate::authorize('viewCauce');
-	}
+    public function __construct()
+    {
+    }
 
 	public function status(Request $request, JobRepository $jobs): JsonResponse
 	{
@@ -139,14 +138,52 @@ class ApiController extends Controller
 		]);
 	}
 
-	public function metrics(Request $request, MetricsRepository $metrics): JsonResponse
-	{
-		$hours = (int) $request->input('hours', 24);
-		$from = CarbonImmutable::now()->subHours($hours);
-		$to = CarbonImmutable::now();
+    public function metrics(Request $request, MetricsRepository $metrics): JsonResponse
+    {
+        $hours = (int) $request->input('hours', 24);
+        $from = CarbonImmutable::now()->subHours($hours);
+        $to = CarbonImmutable::now();
 
-		return response()->json([
-			'data' => $metrics->totals('*', '*', $from, $to),
-		]);
-	}
+        return response()->json([
+            'data' => $metrics->totals('*', '*', $from, $to),
+        ]);
+    }
+
+    public function health(Request $request, JobRepository $jobs): JsonResponse
+    {
+        $status = 'ok';
+        $checks = [];
+
+        try {
+            $jobs->countsByStatus(1);
+            $checks['database'] = 'ok';
+        } catch (\Throwable $e) {
+            $checks['database'] = 'error: ' . $e->getMessage();
+            $status = 'degraded';
+        }
+
+        try {
+            $openBreakers = CircuitBreaker::openKeys();
+            if (count($openBreakers) > 0) {
+                $checks['circuit_breakers_open'] = $openBreakers;
+                $status = $status === 'ok' ? 'warning' : $status;
+            } else {
+                $checks['circuit_breakers_open'] = [];
+            }
+        } catch (\Throwable $e) {
+            $checks['circuit_breakers'] = 'error: ' . $e->getMessage();
+        }
+
+        $httpCode = match ($status) {
+            'ok' => 200,
+            'warning' => 200,
+            'degraded' => 503,
+            default => 500,
+        };
+
+        return response()->json([
+            'status' => $status,
+            'checks' => $checks,
+        ], $httpCode);
+    }
 }
