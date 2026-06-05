@@ -1,0 +1,42 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Marmol89\Cauce\Listeners;
+
+use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Support\Facades\Log;
+use Marmol89\Cauce\Contracts\JobRepository;
+
+class RecordJobProcessing
+{
+    public function __construct(
+        protected JobRepository $jobs,
+    ) {
+    }
+
+    public function handle(JobProcessing $event): void
+    {
+        try {
+            $cauceId = $this->resolveCauceId($event);
+
+            if ($cauceId === null) {
+                return;
+            }
+
+            $this->jobs->markProcessing($cauceId);
+        } catch (\Throwable $e) {
+            Log::warning('Cauce: failed to mark processing', [
+                'job' => $event->job->resolveName() ?? null,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    protected function resolveCauceId(JobProcessing $event): ?string
+    {
+        $payload = method_exists($event->job, 'getPayload') ? $event->job->getPayload() : [];
+
+        return $payload['cauce_id'] ?? null;
+    }
+}

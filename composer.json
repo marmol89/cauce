@@ -1,0 +1,69 @@
+{
+    "name": "marmol89/cauce",
+    "description": "Driver-agnostic queue monitoring and advanced retry strategies for Laravel.",
+    "keywords": [
+        "laravel",
+        "queue",
+        "monitoring",
+        "dashboard",
+        "retry",
+        "backoff",
+        "circuit-breaker",
+        "multi-driver"
+    ],
+    "license": "MIT",
+    "type": "library",
+    "require": {
+        "php": "^8.2",
+        "illuminate/contracts": "^11.0|^12.0|^13.0",
+        "illuminate/database": "^11.0|^12.0|^13.0",
+        "illuminate/queue": "^11.0|^12.0|^13.0",
+        "illuminate/support": "^11.0|^12.0|^13.0",
+        "illuminate/console": "^11.0|^12.0|^13.0",
+        "symfony/uid": "^6.0|^7.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^9.0|^10.0|^11.0",
+        "phpunit/phpunit": "^11.0|^12.0",
+        "mockery/mockery": "^1.6",
+        "livewire/livewire": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Marmol89\\Cauce\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Marmol89\\Cauce\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Marmol89\\Cauce\\CauceServiceProvider"
+            ],
+            "aliases": {
+                "Cauce": "Marmol89\\Cauce\\Facades\\Cauce"
+            }
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "test-coverage": "vendor/bin/phpunit --coverage-text",
+        "testdox": "vendor/bin/phpunit --testdox"
+    },
+    "support": {
+        "issues": "https://github.com/marmol89/cauce/issues",
+        "source": "https://github.com/marmol89/cauce"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
