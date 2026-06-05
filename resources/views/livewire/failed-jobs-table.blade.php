@@ -24,12 +24,12 @@
                         <td class="px-3 py-2 text-slate-600">{{ $job->attempts }}</td>
                         <td class="px-3 py-2 text-slate-500 text-xs">{{ $job->failed_at?->diffForHumans() ?? '—' }}</td>
                         <td class="px-3 py-2 space-x-2">
-                            <button wire:click="retry('{{ $job->id }}')" wire:confirm="Re-queue this job?"
-                                class="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700">
+                            <button wire:click="retry('{{ addslashes($job->id) }}')" wire:confirm="Re-queue this job?"
+                                class="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700" wire:loading.attr="disabled">
                                 Retry
                             </button>
-                            <button wire:click="delete('{{ $job->id }}')" wire:confirm="Delete this job record?"
-                                class="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-rose-600 text-white hover:bg-rose-700">
+                            <button wire:click="delete('{{ addslashes($job->id) }}')" wire:confirm="Delete this job record?"
+                                class="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-rose-600 text-white hover:bg-rose-700" wire:loading.attr="disabled">
                                 Delete
                             </button>
                         </td>

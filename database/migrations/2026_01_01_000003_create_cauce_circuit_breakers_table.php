@@ -22,6 +22,8 @@ return new class extends Migration
             $table->timestamp('half_open_at')->nullable();
             $table->timestamp('closed_at')->nullable();
             $table->timestamps();
+
+            $table->index('state');
         });
     }
 

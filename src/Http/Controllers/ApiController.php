@@ -157,8 +157,8 @@ class ApiController extends Controller
         try {
             $jobs->countsByStatus(1);
             $checks['database'] = 'ok';
-        } catch (\Throwable $e) {
-            $checks['database'] = 'error: ' . $e->getMessage();
+        } catch (\Throwable) {
+            $checks['database'] = 'error';
             $status = 'degraded';
         }
 
@@ -170,8 +170,8 @@ class ApiController extends Controller
             } else {
                 $checks['circuit_breakers_open'] = [];
             }
-        } catch (\Throwable $e) {
-            $checks['circuit_breakers'] = 'error: ' . $e->getMessage();
+        } catch (\Throwable) {
+            $checks['circuit_breakers'] = 'error';
         }
 
         $httpCode = match ($status) {

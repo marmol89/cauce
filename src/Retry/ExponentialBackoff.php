@@ -17,9 +17,14 @@ class ExponentialBackoff implements RetryStrategy
 
     public function delay(int $attempt): int
     {
-        $expo = (int) ($this->base ** max(0, $attempt - 1));
+        $exp = min(62, max(0, $attempt - 1));
+        $result = $this->base ** $exp;
 
-        return min($this->cap, $expo);
+        if (! is_int($result) || $result < 0) {
+            return $this->cap;
+        }
+
+        return (int) min($this->cap, $result);
     }
 
     public function maxAttempts(): int

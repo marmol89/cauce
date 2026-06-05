@@ -18,7 +18,10 @@ class ApplyRetryStrategy
     public function handle(object $job, Closure $next): mixed
     {
         if ($this->strategy instanceof CircuitBreaker && ! $this->strategy->allows()) {
-            $job->release($this->strategy->delay(1));
+            if (method_exists($job, 'release')) {
+                $job->release($this->strategy->delay(1));
+            }
+
             return null;
         }
 

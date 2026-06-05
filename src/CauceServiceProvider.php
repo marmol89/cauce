@@ -149,7 +149,13 @@ class CauceServiceProvider extends ServiceProvider
             $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
         });
 
-        $this->loadRoutesFrom(__DIR__ . '/../routes/api.php');
+        Route::group([
+            'domain' => $this->app['config']->get('cauce.domain'),
+            'prefix' => $this->app['config']->get('cauce.path', 'cauce') . '/api',
+            'middleware' => ['api', \Marmol89\Cauce\Http\Middleware\Authorize::class, 'throttle:120,1'],
+        ], function (): void {
+            $this->loadRoutesFrom(__DIR__ . '/../routes/api.php');
+        });
     }
 
     protected function bootViews(): void
@@ -206,9 +212,15 @@ class CauceServiceProvider extends ServiceProvider
 
     protected function bootGate(): void
     {
-        Gate::define('viewCauce', function ($user = null): bool {
-            return $this->app->environment('local', 'testing', 'staging', 'development')
-                || $this->app['config']->get('cauce.allow_production', false);
+        $allowed = fn ($user = null): bool =>
+            $this->app->environment('local', 'testing', 'staging', 'development')
+            || $this->app['config']->get('cauce.allow_production', false);
+
+        Gate::define('viewCauce', $allowed);
+
+        Gate::define('mutateCauce', function ($user = null) use ($allowed): bool {
+            return $allowed($user)
+                && $this->app['config']->get('cauce.allow_production_mutate', false) !== false;
         });
     }
 

@@ -53,7 +53,9 @@ class RecordJobProcessed
 
     protected function resolveCauceId(JobProcessed $event): ?string
     {
-        $uuid = $event->job->payload()['uuid'] ?? $event->job->getJobId();
+        $payload = $event->job->payload();
+        $uuid = is_array($payload) ? ($payload['uuid'] ?? null) : null;
+        $uuid ??= $event->job->getJobId();
 
         if ($uuid === null || $uuid === '') {
             return null;
@@ -68,10 +70,16 @@ class RecordJobProcessed
             return 0;
         }
 
-        $startedAt = $row->started_at instanceof \DateTimeInterface
-            ? $row->started_at->getTimestamp() + ($row->started_at->format('u') / 1_000_000)
-            : strtotime((string) $row->started_at);
+        if ($row->started_at instanceof \DateTimeInterface) {
+            $start = (float) $row->started_at->format('U.u');
+        } else {
+            $timestamp = strtotime((string) $row->started_at);
+            if ($timestamp === false) {
+                return 0;
+            }
+            $start = (float) $timestamp;
+        }
 
-        return (int) round((microtime(true) - $startedAt) * 1000);
+        return (int) round((microtime(true) - $start) * 1000);
     }
 }

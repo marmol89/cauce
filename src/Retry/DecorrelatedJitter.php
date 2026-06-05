@@ -19,10 +19,15 @@ class DecorrelatedJitter implements RetryStrategy
     {
         // AWS-style decorrelated jitter: sleep = min(cap, random_between(base, prev * 3))
         // For attempt #1 we use $base as the seed.
-        $previous = $attempt <= 1 ? $this->base : ($this->base * (2 ** ($attempt - 1)));
+        $exp = min(30, max(0, $attempt - 1));
+        $previous = $attempt <= 1 ? $this->base : ($this->base * (2 ** $exp));
         $high = max($this->base, $previous * 3);
 
-        return min($this->cap, random_int($this->base, max($this->base + 1, $high)));
+        if ($high > PHP_INT_MAX || $high < 0) {
+            return $this->cap;
+        }
+
+        return min($this->cap, random_int($this->base, max($this->base + 1, (int) $high)));
     }
 
     public function maxAttempts(): int

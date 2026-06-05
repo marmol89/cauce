@@ -17,7 +17,14 @@ class FibonacciBackoff implements RetryStrategy
 
     public function delay(int $attempt): int
     {
-        return min($this->cap, $this->base * $this->fibonacci(max(1, $attempt)));
+        $fib = $this->fibonacci(max(1, $attempt));
+        $result = $this->base * $fib;
+
+        if (! is_int($result) || $result < 0) {
+            return $this->cap;
+        }
+
+        return (int) min($this->cap, $result);
     }
 
     public function maxAttempts(): int
@@ -38,8 +45,14 @@ class FibonacciBackoff implements RetryStrategy
 
         $a = 0;
         $b = 1;
+        $capDivBase = (int) ($this->cap / max(1, $this->base));
+
         for ($i = 2; $i <= $n; $i++) {
-            [$a, $b] = [$b, $a + $b];
+            $next = $a + $b;
+            if ($next > $capDivBase || $next < 0) {
+                return $next;
+            }
+            [$a, $b] = [$b, $next];
         }
 
         return $b;

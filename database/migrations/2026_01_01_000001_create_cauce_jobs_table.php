@@ -30,6 +30,9 @@ return new class extends Migration
             $table->timestamp('failed_at')->nullable();
             $table->timestamps();
 
+            $table->index('created_at');
+            $table->index('failed_at');
+            $table->index(['status', 'failed_at']);
             $table->index(['connection', 'queue', 'status']);
             $table->index('finished_at');
         });

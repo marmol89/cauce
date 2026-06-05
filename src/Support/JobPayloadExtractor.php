@@ -21,7 +21,8 @@ class JobPayloadExtractor
     public function fromQueued(JobQueued $event): array
     {
         $maxSize = (int) config('cauce.monitoring.payload_max_size', 65535);
-        $payload = $event->payload();
+        $rawPayload = $event->payload();
+        $payload = is_array($rawPayload) ? $rawPayload : [];
 
         return [
             'uuid' => $payload['uuid'] ?? ($event->id !== null ? (string) $event->id : $this->ulid()),
@@ -147,20 +148,24 @@ class JobPayloadExtractor
             return null;
         }
 
-        $previous = [];
+        $outerClass = $exception::class;
+        $outerMessage = $exception->getMessage();
 
-        while ($exception->getPrevious() !== null) {
-            $exception = $exception->getPrevious();
-            $previous[] = sprintf('%s: %s', $exception::class, $exception->getMessage());
+        $previous = [];
+        $current = $exception;
+
+        while ($current->getPrevious() !== null) {
+            $current = $current->getPrevious();
+            $previous[] = sprintf('%s: %s', $current::class, $current->getMessage());
         }
 
-        $trace = implode("\n", $previous);
+        $chain = implode("\n", $previous);
 
         return trim(sprintf(
-            "%s: %s\n%s\n\n%s",
-            $exception::class,
-            $exception->getMessage(),
-            $trace,
+            "%s: %s\n\nPrevious:\n%s\n\n%s",
+            $outerClass,
+            $outerMessage,
+            $chain ?: '(none)',
             $exception->getTraceAsString(),
         ));
     }

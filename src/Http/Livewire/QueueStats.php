@@ -25,6 +25,11 @@ class QueueStats extends Component
         $this->hours = max(1, min(168, $this->hours));
     }
 
+    public function updatedHours(): void
+    {
+        $this->hours = max(1, min(168, $this->hours));
+    }
+
     public function render()
     {
         return view('cauce::livewire.queue-stats');

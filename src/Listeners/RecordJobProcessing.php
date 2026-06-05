@@ -35,7 +35,9 @@ class RecordJobProcessing
 
     protected function resolveCauceId(JobProcessing $event): ?string
     {
-        $uuid = $event->job->payload()['uuid'] ?? $event->job->getJobId();
+        $payload = $event->job->payload();
+        $uuid = is_array($payload) ? ($payload['uuid'] ?? null) : null;
+        $uuid ??= $event->job->getJobId();
 
         if ($uuid === null || $uuid === '') {
             return null;

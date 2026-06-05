@@ -25,6 +25,12 @@ class FailedJobsTable extends Component
     public function mount(): void
     {
         $this->perPage = (int) config('cauce.dashboard.rows_per_page', 25);
+        $this->perPage = max(5, min(100, $this->perPage));
+    }
+
+    public function updatedPerPage(): void
+    {
+        $this->perPage = max(5, min(100, $this->perPage));
     }
 
     public function render()

@@ -33,7 +33,14 @@ class DeadLetterManager
         $payload['cauce_failed_at'] = now()->toIso8601String();
         $payload['cauce_exception'] = $row->exception ?? null;
 
-        Queue::connection($connection)
-            ->pushRaw(json_encode($payload, JSON_UNESCAPED_UNICODE), $queue);
+        try {
+            Queue::connection($connection)
+                ->pushRaw(json_encode($payload, JSON_UNESCAPED_UNICODE), $queue);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Cauce: failed to push to dead-letter queue', [
+                'job_id' => $row->id ?? null,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

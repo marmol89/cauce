@@ -199,7 +199,9 @@ class DatabaseJobRepository implements JobRepository
             return false;
         }
 
-        if (! $this->dispatchFromPayload($row, $connection, $queue)) {
+        $payload = $this->preparePayload($row);
+
+        if ($payload === null) {
             return false;
         }
 
@@ -215,12 +217,28 @@ class DatabaseJobRepository implements JobRepository
                 'updated_at' => now(),
             ]);
 
+        try {
+            Queue::connection($connection ?: $row->connection)
+                ->pushRaw($payload, $queue ?: $row->queue);
+        } catch (\Throwable) {
+            $this->connection->table($this->table)
+                ->where('id', $cauceId)
+                ->update([
+                    'status' => 'failed',
+                    'exception' => $row->exception ?? null,
+                    'failed_at' => $row->failed_at ?? now(),
+                    'updated_at' => now(),
+                ]);
+
+            return false;
+        }
+
         JobRetried::dispatch($cauceId, $row->name, $row->connection, $row->queue);
 
         return true;
     }
 
-    protected function dispatchFromPayload(object $row, ?string $connection = null, ?string $queue = null): bool
+    protected function preparePayload(object $row): ?string
     {
         $payload = $row->payload;
 
@@ -229,20 +247,17 @@ class DatabaseJobRepository implements JobRepository
         }
 
         if (! is_array($payload) || empty($payload['data']['commandName'])) {
-            return false;
+            return null;
         }
 
         if (! class_exists($payload['data']['commandName'])) {
-            return false;
+            return null;
         }
 
         $payload['attempts'] = 0;
         $payload['uuid'] = (string) (\Symfony\Component\Uid\Uuid::v4());
 
-        Queue::connection($connection ?: $row->connection)
-            ->pushRaw(json_encode($payload, JSON_UNESCAPED_UNICODE), $queue ?: $row->queue);
-
-        return true;
+        return json_encode($payload, JSON_UNESCAPED_UNICODE);
     }
 
     public function delete(string $cauceId): bool
@@ -387,7 +402,10 @@ class DatabaseJobRepository implements JobRepository
         if (! empty($filters['tags'])) {
             $tags = (array) $filters['tags'];
             foreach ($tags as $tag) {
-                $query->where('tags', 'like', '%"' . $tag . '"%');
+                $query->whereRaw(
+                    'JSON_CONTAINS(tags, ?)',
+                    [json_encode($tag, JSON_UNESCAPED_UNICODE)],
+                );
             }
         }
     }

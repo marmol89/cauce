@@ -43,6 +43,11 @@ class JobsTable extends Component
         $this->perPage = max(5, min(100, (int) config('cauce.dashboard.rows_per_page', 25)));
     }
 
+    public function updatedPerPage(): void
+    {
+        $this->perPage = max(5, min(100, $this->perPage));
+    }
+
     public function render()
     {
         return view('cauce::livewire.jobs-table');

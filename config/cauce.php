@@ -42,6 +42,8 @@ return [
 
     'allow_production' => env('CAUCE_ALLOW_PRODUCTION', false),
 
+    'allow_production_mutate' => env('CAUCE_ALLOW_PRODUCTION_MUTATE', false),
+
     /*
     |--------------------------------------------------------------------------
     | Middleware

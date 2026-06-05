@@ -47,7 +47,7 @@
             </thead>
             <tbody class="divide-y divide-slate-100">
                 @forelse($this->jobs as $job)
-                    <tr>
+                    <tr wire:key="job-{{ $job->id }}">
                         <td class="px-3 py-2 font-mono text-xs text-slate-700">
                             <a href="{{ route('cauce.jobs.show', $job->id) }}" class="hover:text-indigo-600">
                                 {{ \Illuminate\Support\Str::limit($job->name, 40) }}

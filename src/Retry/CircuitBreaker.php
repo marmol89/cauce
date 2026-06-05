@@ -59,10 +59,22 @@ class CircuitBreaker implements RetryStrategy
         if ($row->state === self::STATE_OPEN) {
             $openedAt = strtotime((string) $row->opened_at);
             if ($openedAt !== false && (time() - $openedAt) >= $this->cooldown) {
-                CircuitBreakerHalfOpened::dispatch($this->key());
-                $this->transitionTo(self::STATE_HALF_OPEN);
+                return $this->connection()->transaction(function () {
+                    $fresh = $this->getRowLocked();
+                    if ($fresh === null || $fresh->state !== self::STATE_OPEN) {
+                        return $fresh !== null ? (string) $fresh->state : self::STATE_CLOSED;
+                    }
 
-                return self::STATE_HALF_OPEN;
+                    $recheck = strtotime((string) $fresh->opened_at);
+                    if ($recheck === false || (time() - $recheck) < $this->cooldown) {
+                        return self::STATE_OPEN;
+                    }
+
+                    CircuitBreakerHalfOpened::dispatch($this->key());
+                    $this->transitionTo(self::STATE_HALF_OPEN);
+
+                    return self::STATE_HALF_OPEN;
+                });
             }
         }
 
@@ -76,51 +88,61 @@ class CircuitBreaker implements RetryStrategy
 
     public function recordSuccess(): void
     {
-        $row = $this->getRow();
+        $this->connection()->transaction(function () {
+            $row = $this->getRowLocked();
 
-        if ($row !== null && $row->state === self::STATE_HALF_OPEN) {
-            CircuitBreakerClosed::dispatch($this->key());
+            if ($row !== null && $row->state === self::STATE_HALF_OPEN) {
+                CircuitBreakerClosed::dispatch($this->key());
 
-            if (app()->bound(AlertManager::class)) {
-                app(AlertManager::class)->notifyCircuitBreakerClosed($this->key());
+                if (app()->bound(AlertManager::class)) {
+                    app(AlertManager::class)->notifyCircuitBreakerClosed($this->key());
+                }
+
+                $this->transitionToLocked(self::STATE_CLOSED, $row);
+                return;
             }
 
-            $this->transitionTo(self::STATE_CLOSED);
-            return;
-        }
-
-        $this->upsertRow([
-            'state' => self::STATE_CLOSED,
-            'failures' => 0,
-            'opened_at' => null,
-            'half_open_at' => null,
-            'closed_at' => now(),
-        ]);
+            $this->upsertRow([
+                'state' => self::STATE_CLOSED,
+                'failures' => 0,
+                'opened_at' => null,
+                'half_open_at' => null,
+                'closed_at' => now(),
+            ]);
+        });
     }
 
     public function recordFailure(): void
     {
-        $row = $this->getRow();
+        $shouldDispatch = false;
 
-        $failures = $row !== null ? (int) $row->failures + 1 : 1;
-        $state = $row !== null ? (string) $row->state : self::STATE_CLOSED;
+        $this->connection()->transaction(function () use (&$shouldDispatch) {
+            $row = $this->getRowLocked();
 
-        $data = [
-            'state' => $state,
-            'failures' => $failures,
-            'opened_at' => $row->opened_at ?? null,
-            'half_open_at' => $row->half_open_at ?? null,
-            'closed_at' => $row->closed_at ?? null,
-        ];
+            $failures = $row !== null ? (int) $row->failures + 1 : 1;
+            $state = $row !== null ? (string) $row->state : self::STATE_CLOSED;
 
-        if ($failures >= $this->threshold) {
-            $data['state'] = self::STATE_OPEN;
-            $data['opened_at'] = now();
-        }
+            $data = [
+                'state' => $state,
+                'failures' => $failures,
+                'opened_at' => $row->opened_at ?? null,
+                'half_open_at' => $row->half_open_at ?? null,
+                'closed_at' => $row->closed_at ?? null,
+            ];
 
-        $this->upsertRow($data);
+            if ($failures >= $this->threshold) {
+                $data['state'] = self::STATE_OPEN;
+                $data['opened_at'] = now();
+            }
 
-        if ($data['state'] === self::STATE_OPEN && $data['failures'] === $this->threshold) {
+            $this->upsertRow($data);
+
+            if ($data['state'] === self::STATE_OPEN && $data['failures'] === $this->threshold) {
+                $shouldDispatch = true;
+            }
+        });
+
+        if ($shouldDispatch) {
             CircuitBreakerOpened::dispatch($this->key(), $this->threshold);
 
             if (app()->bound(AlertManager::class)) {
@@ -138,16 +160,20 @@ class CircuitBreaker implements RetryStrategy
 
     public static function openKeys(): array
     {
-        $name = config('cauce.storage.database.connection');
+        try {
+            $name = config('cauce.storage.database.connection');
 
-        /** @var \Illuminate\Database\ConnectionResolverInterface $resolver */
-        $resolver = app('db');
-        $connection = $resolver->connection($name);
+            /** @var \Illuminate\Database\ConnectionResolverInterface $resolver */
+            $resolver = app('db');
+            $connection = $resolver->connection($name);
 
-        return $connection->table('cauce_circuit_breakers')
-            ->where('state', self::STATE_OPEN)
-            ->pluck('key')
-            ->toArray();
+            return $connection->table('cauce_circuit_breakers')
+                ->where('state', self::STATE_OPEN)
+                ->pluck('key')
+                ->toArray();
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     protected function transitionTo(string $state): void
@@ -156,7 +182,28 @@ class CircuitBreaker implements RetryStrategy
 
         $data = [
             'state' => $state,
-            'failures' => $row->failures ?? 0,
+            'failures' => $row !== null ? (int) $row->failures : 0,
+            'opened_at' => $row->opened_at ?? null,
+            'half_open_at' => $row->half_open_at ?? null,
+            'closed_at' => $row->closed_at ?? null,
+        ];
+
+        if ($state === self::STATE_HALF_OPEN) {
+            $data['half_open_at'] = now();
+        }
+
+        if ($state === self::STATE_CLOSED) {
+            $data['closed_at'] = now();
+        }
+
+        $this->upsertRow($data);
+    }
+
+    protected function transitionToLocked(string $state, object $row): void
+    {
+        $data = [
+            'state' => $state,
+            'failures' => (int) ($row->failures ?? 0),
             'opened_at' => $row->opened_at ?? null,
             'half_open_at' => $row->half_open_at ?? null,
             'closed_at' => $row->closed_at ?? null,
@@ -177,6 +224,14 @@ class CircuitBreaker implements RetryStrategy
     {
         return $this->connection()->table('cauce_circuit_breakers')
             ->where('key', $this->key())
+            ->first();
+    }
+
+    protected function getRowLocked(): ?object
+    {
+        return $this->connection()->table('cauce_circuit_breakers')
+            ->where('key', $this->key())
+            ->lockForUpdate()
             ->first();
     }
 

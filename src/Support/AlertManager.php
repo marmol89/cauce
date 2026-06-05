@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Marmol89\Cauce\Support;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Marmol89\Cauce\Contracts\MetricsRepository;
@@ -25,6 +26,12 @@ class AlertManager
 
         $threshold = (int) config('cauce.alerts.failed_job_threshold', 10);
         $window = (int) config('cauce.alerts.failed_job_window_minutes', 5);
+
+        $cacheKey = 'cauce:alert_dedupe:failed_job_threshold';
+        if (Cache::get($cacheKey)) {
+            return;
+        }
+
         $from = CarbonImmutable::now()->subMinutes($window);
         $to = CarbonImmutable::now();
 
@@ -37,6 +44,8 @@ class AlertManager
                 $window,
             );
             $this->send('failed_job_threshold', $message, ['failed' => $totals['failed'], 'window_minutes' => $window]);
+
+            Cache::put($cacheKey, true, max(60, $window * 60));
         }
     }
 

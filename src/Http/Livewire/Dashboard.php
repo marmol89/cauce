@@ -28,6 +28,12 @@ class Dashboard extends Component
     public function mount(): void
     {
         $this->hours = (int) config('cauce.dashboard.refresh_hours', 24);
+        $this->hours = max(1, min(168, $this->hours));
+    }
+
+    public function updatedHours(): void
+    {
+        $this->hours = max(1, min(168, $this->hours));
     }
 
     public function render()

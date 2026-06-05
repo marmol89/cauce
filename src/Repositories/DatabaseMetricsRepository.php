@@ -63,44 +63,47 @@ class DatabaseMetricsRepository implements MetricsRepository
 
     protected function incrementUpsert(string $connection, string $queue, \DateTimeImmutable $minute, string $metric, float $value, ?int $runtimeMs): void
     {
-        $existing = $this->connection->table($this->table)
-            ->where('connection', $connection)
-            ->where('queue', $queue)
-            ->where('minute', $minute)
-            ->first();
+        $this->connection->transaction(function () use ($connection, $queue, $minute, $metric, $value, $runtimeMs) {
+            $existing = $this->connection->table($this->table)
+                ->where('connection', $connection)
+                ->where('queue', $queue)
+                ->where('minute', $minute)
+                ->lockForUpdate()
+                ->first();
 
-        if ($existing !== null) {
-            $update = ['updated_at' => now()];
+            if ($existing !== null) {
+                $update = ['updated_at' => now()];
 
-            if ($metric === 'processed') {
-                $update['processed'] = $this->connection->raw('processed + 1');
-                $update['runtime_sum_ms'] = $this->connection->raw('runtime_sum_ms + ' . (int) ($runtimeMs ?? 0));
-                $update['runtime_count'] = $this->connection->raw('runtime_count + 1');
-            } elseif ($metric === 'failed') {
-                $update['failed'] = $this->connection->raw('failed + ' . (int) $value);
-            } elseif ($metric === 'throughput') {
-                $update['throughput'] = $this->connection->raw('throughput + ' . (float) $value);
+                if ($metric === 'processed') {
+                    $update['processed'] = $this->connection->raw('processed + 1');
+                    $update['runtime_sum_ms'] = $this->connection->raw('runtime_sum_ms + ' . (int) ($runtimeMs ?? 0));
+                    $update['runtime_count'] = $this->connection->raw('runtime_count + 1');
+                } elseif ($metric === 'failed') {
+                    $update['failed'] = $this->connection->raw('failed + ' . (int) $value);
+                } elseif ($metric === 'throughput') {
+                    $update['throughput'] = $this->connection->raw('throughput + ' . (float) $value);
+                }
+
+                $this->connection->table($this->table)
+                    ->where('id', $existing->id)
+                    ->update($update);
+            } else {
+                $insert = [
+                    'connection' => $connection,
+                    'queue' => $queue,
+                    'minute' => $minute,
+                    'processed' => $metric === 'processed' ? 1 : 0,
+                    'failed' => $metric === 'failed' ? (int) $value : 0,
+                    'runtime_sum_ms' => $metric === 'processed' ? (int) ($runtimeMs ?? 0) : 0,
+                    'runtime_count' => $metric === 'processed' ? 1 : 0,
+                    'throughput' => $metric === 'throughput' ? $value : 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+
+                $this->connection->table($this->table)->insert($insert);
             }
-
-            $this->connection->table($this->table)
-                ->where('id', $existing->id)
-                ->update($update);
-        } else {
-            $insert = [
-                'connection' => $connection,
-                'queue' => $queue,
-                'minute' => $minute,
-                'processed' => $metric === 'processed' ? 1 : 0,
-                'failed' => $metric === 'failed' ? (int) $value : 0,
-                'runtime_sum_ms' => $metric === 'processed' ? (int) ($runtimeMs ?? 0) : 0,
-                'runtime_count' => $metric === 'processed' ? 1 : 0,
-                'throughput' => $metric === 'throughput' ? $value : 0,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-
-            $this->connection->table($this->table)->insert($insert);
-        }
+        });
     }
 
     public function series(string $connection, string $queue, string $metric, CarbonImmutable $from, CarbonImmutable $to, int $bucket = 60): Collection
